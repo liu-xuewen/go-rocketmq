@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log"
 	"strconv"
 	"strings"
 	"sync"
@@ -260,7 +259,7 @@ func (m *MqClient) tryToFindTopicPublishInfo(topic string) (topicPublicInfo *Top
 
 		err = m.updateTopicRouteInfoFromNameServerByTopic(topic)
 		if err != nil {
-			log.Println(err) // if updateRouteInfo error, maybe we can use the defaultTopic
+			Println(err) // if updateRouteInfo error, maybe we can use the defaultTopic
 		}
 		m.topicPublishInfoLock.RLock()
 		value, ok := m.topicPublishInfoTable[topic]
@@ -354,7 +353,7 @@ func (self *MqClient) findConsumerIdList(topic string, groupName string) ([]stri
 	brokerAddr, ok := self.findBrokerAddrByTopic(topic)
 	if !ok {
 		err := self.updateTopicRouteInfoFromNameServerByTopic(topic)
-		log.Println(err)
+		Println(err)
 		brokerAddr, ok = self.findBrokerAddrByTopic(topic)
 	}
 
@@ -390,7 +389,7 @@ func (self *MqClient) getConsumerIdListByGroup(addr string, consumerGroup string
 
 	response, err := self.remotingClient.invokeSync(addr, request, timeoutMillis)
 	if err != nil {
-		log.Println(err)
+		Println(err)
 		return nil, err
 	}
 
@@ -400,7 +399,7 @@ func (self *MqClient) getConsumerIdListByGroup(addr string, consumerGroup string
 		bodyjson = strings.Replace(bodyjson, "1:", "\"1\":", -1)
 		err := json.Unmarshal([]byte(bodyjson), getConsumerListByGroupResponseBody)
 		if err != nil {
-			log.Println(err)
+			Println(err)
 			return nil, err
 		}
 		return getConsumerListByGroupResponseBody.ConsumerIdList, nil
@@ -426,7 +425,7 @@ func (self *MqClient) getTopicRouteInfoFromNameServer(topic string, timeoutMilli
 		bodyjson = strings.Replace(bodyjson, "{1:", "{\"1\":", -1)
 		err = json.Unmarshal([]byte(bodyjson), topicRouteData)
 		if err != nil {
-			log.Println(err)
+			Println(err)
 			return nil, err
 		}
 		return topicRouteData, nil
@@ -547,17 +546,17 @@ func (self *MqClient) sendHeartbeatToAllBrokerWithLock() error {
 
 			data, err := json.Marshal(*heartbeatData)
 			if err != nil {
-				log.Println(err)
+				Println(err)
 				return err
 			}
 			remotingCommand.Body = data
-			log.Println("send heartbeat to broker[", addr+"]")
+			Println("send heartbeat to broker[", addr+"]")
 			response, err := self.remotingClient.invokeSync(addr, remotingCommand, 3000)
 			if err != nil {
-				log.Println(err)
+				Println(err)
 			} else {
 				if response == nil || response.Code != SUCCESS {
-					log.Println("send heartbeat response  error")
+					Println("send heartbeat response  error")
 				}
 			}
 		}
@@ -636,7 +635,7 @@ func (self *MqClient) queryConsumerOffset(addr string, requestHeader *QueryConsu
 	reponse, err := self.remotingClient.invokeSync(addr, remotingCommand, timeoutMillis)
 
 	if err != nil {
-		log.Println(err)
+		Println(err)
 		return 0, err
 	}
 
@@ -649,14 +648,14 @@ func (self *MqClient) queryConsumerOffset(addr string, requestHeader *QueryConsu
 		if offsetStr, ok := offsetInter.(string); ok {
 			offset, err := strconv.ParseInt(offsetStr, 10, 64)
 			if err != nil {
-				log.Println(err)
+				Println(err)
 				return 0, err
 			}
 			return offset, nil
 
 		}
 	}
-	log.Println(requestHeader, reponse)
+	Println(requestHeader, reponse)
 	return 0, errors.New("query offset error")
 }
 

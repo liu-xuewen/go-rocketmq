@@ -2,14 +2,9 @@ package rocketmq
 
 import (
 	"errors"
-	"log"
 	"os"
 	"strconv"
 	"time"
-
-	"github.com/StyleTang/incubator-rocketmq-externals/rocketmq-go/util"
-	"github.com/apache/rocketmq-externals/rocketmq-go/model/constant"
-	"github.com/apache/rocketmq-externals/rocketmq-go/remoting"
 )
 
 /*
@@ -60,11 +55,38 @@ type SendMessageResponseHeader struct {
 	MsgRegion     string
 }
 
+func CurrentTimeMillisInt64() (ret int64) {
+	ret = time.Now().UnixNano() / 1000000
+	return
+}
+
+//NAME_VALUE_SEPARATOR char 1 and 2 from java code
+var NAME_VALUE_SEPARATOR = string(rune(1))
+
+//PROPERTY_SEPARATOR property separator
+var PROPERTY_SEPARATOR = string(rune(2))
+
+//MessageProperties2String convert message properties to string
+func MessageProperties2String(propertiesMap map[string]string) (ret string) {
+	for key, value := range propertiesMap {
+		ret = ret + key + NAME_VALUE_SEPARATOR + value + PROPERTY_SEPARATOR
+	}
+	return
+}
+
 //FromMap convert map[string]interface to struct
 func (s *SendMessageResponseHeader) FromMap(headerMap map[string]interface{}) {
 	s.MsgId = headerMap["msgId"].(string)
-	s.QueueId = util.StrToInt32WithDefaultValue(headerMap["queueId"].(string), -1)
-	s.QueueOffset = util.StrToInt64WithDefaultValue(headerMap["queueOffset"].(string), -1)
+	queueID, err := strconv.ParseInt(headerMap["queueId"].(string), 10, 32)
+	if err != nil {
+		queueID = -1
+	}
+	s.QueueId = int32(queueID)
+	queueOffset, err := strconv.ParseInt(headerMap["queueOffset"].(string), 10, 64)
+	if err != nil {
+		queueOffset = -1
+	}
+	s.QueueOffset = queueOffset
 	transactionId := headerMap["transactionId"]
 	if transactionId != nil {
 		s.TransactionId = headerMap["transactionId"].(string)
@@ -173,7 +195,7 @@ func (d *DefaultProducer) Send(msg *MessageExt) (sendResult *SendResult, err err
 		begin := time.Now()
 		sendResult, err = d.doSendMessage(msg, messageQueue, communicationMode, nil, topicPublishInfo, int64(timeout))
 		end := time.Now().Sub(begin)
-		log.Printf("send message cost %#v(s)", end.Seconds())
+		Printf("send message cost %#v(s)", end.Seconds())
 		switch communicationMode {
 		case "Async":
 			return
@@ -224,13 +246,13 @@ func (d *DefaultProducer) doSendMessage(msg *MessageExt, messageQueue MessageQue
 	sendMessageHeader := &SendMessageRequestHeader{
 		ProducerGroup:         d.producerGroup,
 		Topic:                 msg.Topic,
-		DefaultTopic:          constant.DEFAULT_TOPIC,
+		DefaultTopic:          DEFAULT_TOPIC,
 		DefaultTopicQueueNums: 4,
 		QueueId:               messageQueue.queueId,
 		SysFlag:               sysFlag,
-		BornTimestamp:         util.CurrentTimeMillisInt64(),
+		BornTimestamp:         CurrentTimeMillisInt64(),
 		Flag:                  msg.Flag,
-		Properties:            util.MessageProperties2String(msg.Properties),
+		Properties:            MessageProperties2String(msg.Properties),
 		UnitMode:              false,
 		//ReconsumeTimes:        msg.GetReconsumeTimes(),
 		//MaxReconsumeTimes:     msg.GetMaxReconsumeTimes(),
@@ -242,7 +264,7 @@ func (d *DefaultProducer) doSendMessage(msg *MessageExt, messageQueue MessageQue
 	}
 
 	remoteClient := d.mqClient.remotingClient
-	remotingCommand := NewRemotingCommandWithBody(remoting.SEND_MESSAGE, sendMessageHeader, msg.Body)
+	remotingCommand := NewRemotingCommandWithBody(SEND_MESSAGE, sendMessageHeader, msg.Body)
 
 	switch communicationMode {
 	case "Async":
@@ -263,7 +285,7 @@ func (d *DefaultProducer) doSendMessage(msg *MessageExt, messageQueue MessageQue
 		var response *RemotingCommand
 		response, err = remoteClient.invokeSync(brokerAddr, remotingCommand, timeout)
 		if err != nil {
-			log.Println(err)
+			Println(err)
 			return
 		}
 		sendResult, err = processSendResponse(messageQueue.brokerName, msg, response)
@@ -271,16 +293,16 @@ func (d *DefaultProducer) doSendMessage(msg *MessageExt, messageQueue MessageQue
 	case "OneWay":
 		err = remoteClient.invokeOneWay(brokerAddr, remotingCommand, timeout)
 		if err != nil {
-			log.Println(err)
+			Println(err)
 			return
 		}
 		break
 	default:
-		log.Printf("unknown producer communicate mode")
+		Printf("unknown producer communicate mode")
 		break
 	}
 	if err != nil {
-		log.Println(err)
+		Println(err)
 		return
 	}
 	return
@@ -290,28 +312,28 @@ func processSendResponse(brokerName string, message *MessageExt,
 	response *RemotingCommand) (sendResult *SendResult, err error) {
 	sendResult = &SendResult{}
 	switch response.Code {
-	case remoting.FLUSH_DISK_TIMEOUT:
+	case FLUSH_DISK_TIMEOUT:
 		{
 			sendResult.sendStatus = FlushDiskTimeout
 			break
 		}
-	case remoting.FLUSH_SLAVE_TIMEOUT:
+	case FLUSH_SLAVE_TIMEOUT:
 		{
 			sendResult.sendStatus = FlushSlaveTimeout
 			break
 		}
-	case remoting.SLAVE_NOT_AVAILABLE:
+	case SLAVE_NOT_AVAILABLE:
 		{
 			sendResult.sendStatus = SlaveNotAvaliable
 			break
 		}
-	case remoting.SUCCESS:
+	case SUCCESS:
 		{
 			sendResult.sendStatus = SendOK
 			break
 		}
 	default:
-		err = errors.New("response.Code error_code=" + util.IntToString(int(response.Code)))
+		err = errors.New("response.Code error_code=" + strconv.Itoa(int(response.Code)))
 		return
 	}
 	var responseHeader = &SendMessageResponseHeader{}

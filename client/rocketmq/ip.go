@@ -1,16 +1,34 @@
 package rocketmq
 
 import (
+	"flag"
 	"log"
 	"net"
 	"os"
 	"strings"
 )
 
+var (
+	logger *log.Logger
+	debug  bool
+)
+
 func init() {
-	log.SetFlags(log.Ldate | log.Ltime | log.Lshortfile)
-	log.SetOutput(os.Stdout)
-	log.SetPrefix("[rocketMQ]")
+	logger = log.New(os.Stdout, "[rocketMQ]", log.Ldate|log.Ltime|log.Lshortfile)
+	flag.BoolVar(&debug, "debug", false, "set this true to output debug log")
+	flag.Parse()
+}
+
+func Printf(format string, v ...interface{}) {
+	if debug {
+		logger.Printf(format, v)
+	}
+}
+
+func Println(v ...interface{}) {
+	if debug {
+		logger.Println(v)
+	}
 }
 
 //GetIp4Bytes get ip4 byte array

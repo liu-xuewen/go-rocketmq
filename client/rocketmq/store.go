@@ -2,7 +2,6 @@ package rocketmq
 
 import (
 	"errors"
-	"log"
 	"sync"
 	"sync/atomic"
 )
@@ -46,7 +45,7 @@ func (self *RemoteOffsetStore) readOffset(mq *MessageQueue, readType int) int64 
 		offset, err := self.fetchConsumeOffsetFromBroker(mq)
 
 		if err != nil {
-			log.Println(err)
+			Println(err)
 			return -1
 		}
 		self.updateOffset(mq, offset, false)
@@ -83,7 +82,7 @@ func (self *RemoteOffsetStore) persist(mq *MessageQueue) {
 	if ok {
 		err := self.updateConsumeOffsetToBroker(mq, offset)
 		if err != nil {
-			log.Println(err)
+			Println(err)
 		}
 	}
 }

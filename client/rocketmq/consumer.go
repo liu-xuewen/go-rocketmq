@@ -2,7 +2,6 @@ package rocketmq
 
 import (
 	"fmt"
-	"log"
 	"net"
 	"os"
 	"strconv"
@@ -194,7 +193,7 @@ func (self *DefaultConsumer) pullMessage(pullRequest *PullRequest) {
 					if nextBeginOffsetStr, ok := nextBeginOffsetInter.(string); ok {
 						nextBeginOffset, err = strconv.ParseInt(nextBeginOffsetStr, 10, 64)
 						if err != nil {
-							log.Println(err)
+							Println(err)
 							return
 						}
 
@@ -204,21 +203,21 @@ func (self *DefaultConsumer) pullMessage(pullRequest *PullRequest) {
 				msgs := decodeMessage(responseFuture.responseCommand.Body)
 				err = self.messageListener(msgs)
 				if err != nil {
-					log.Println(err)
+					Println(err)
 					//TODO retry
 				} else {
 					self.offsetStore.updateOffset(pullRequest.messageQueue, nextBeginOffset, false)
 				}
 			} else if responseCommand.Code == PULL_NOT_FOUND {
 			} else if responseCommand.Code == PULL_RETRY_IMMEDIATELY || responseCommand.Code == PULL_OFFSET_MOVED {
-				log.Printf("pull message error,code=%d,request=%v", responseCommand.Code, requestHeader)
+				Printf("pull message error,code=%d,request=%v", responseCommand.Code, requestHeader)
 				var err error
 				pullResult := responseCommand.ExtFields
 				if nextBeginOffsetInter, ok := pullResult["nextBeginOffset"]; ok {
 					if nextBeginOffsetStr, ok := nextBeginOffsetInter.(string); ok {
 						nextBeginOffset, err = strconv.ParseInt(nextBeginOffsetStr, 10, 64)
 						if err != nil {
-							log.Println(err)
+							Println(err)
 						}
 
 					}
@@ -226,12 +225,12 @@ func (self *DefaultConsumer) pullMessage(pullRequest *PullRequest) {
 				}
 				//time.Sleep(1 * time.Second)
 			} else {
-				log.Println(fmt.Sprintf("pull message error,code=%d,body=%s", responseCommand.Code, string(responseCommand.Body)))
-				log.Println(pullRequest.messageQueue)
+				Println(fmt.Sprintf("pull message error,code=%d,body=%s", responseCommand.Code, string(responseCommand.Body)))
+				Println(pullRequest.messageQueue)
 				time.Sleep(1 * time.Second)
 			}
 		} else {
-			log.Println("responseFuture is nil")
+			Println("responseFuture is nil")
 		}
 
 		nextPullRequest := &PullRequest{
