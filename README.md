@@ -1,7 +1,7 @@
 # rocketMQ client sdk
 
 # import
-import	"git.dz11.com/vega/rocketmq"
+import	"github.com/powxiao/rocketmq"
 
 # example
 * 见example.go
