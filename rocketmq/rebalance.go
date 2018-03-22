@@ -2,6 +2,7 @@ package rocketmq
 
 import (
 	"errors"
+	"log"
 	"sort"
 	"sync"
 )
@@ -130,7 +131,7 @@ func (self *AllocateMessageQueueAveragely) allocate(consumerGroup string, curren
 func (self *Rebalance) rebalanceByTopic(topic string) error {
 	cidAll, err := self.mqClient.findConsumerIdList(topic, self.groupName)
 	if err != nil {
-		Println(err)
+		log.Println(err)
 		return err
 	}
 
@@ -148,11 +149,11 @@ func (self *Rebalance) rebalanceByTopic(topic string) error {
 	allocateResult, err := self.allocateMessageQueueStrategy.allocate(self.groupName, self.mqClient.clientId, mqs, cidAll)
 
 	if err != nil {
-		Println(err)
+		log.Println(err)
 		return err
 	}
 
-	Printf("rebalance topic[%s]", topic)
+	//log.Printf("rebalance topic[%s]", topic)
 	self.updateProcessQueueTableInRebalance(topic, allocateResult)
 	return nil
 }
