@@ -2,6 +2,7 @@ package rocketmq
 
 import (
 	"errors"
+	"log"
 	"sync"
 	"sync/atomic"
 )
@@ -21,6 +22,12 @@ type OffsetStore interface {
 	//removeOffset(mq MessageQueue)
 	//cloneOffsetTable(topic string) map[MessageQueue]int64
 }
+
+/*
+LocalFileOffsetStore
+RemoteBrokerOffsetStore
+*/
+
 type RemoteOffsetStore struct {
 	groupName       string
 	mqClient        *MqClient
@@ -45,7 +52,7 @@ func (self *RemoteOffsetStore) readOffset(mq *MessageQueue, readType int) int64 
 		offset, err := self.fetchConsumeOffsetFromBroker(mq)
 
 		if err != nil {
-			Println(err)
+			log.Println(err)
 			return -1
 		}
 		self.updateOffset(mq, offset, false)
@@ -82,7 +89,7 @@ func (self *RemoteOffsetStore) persist(mq *MessageQueue) {
 	if ok {
 		err := self.updateConsumeOffsetToBroker(mq, offset)
 		if err != nil {
-			Println(err)
+			log.Println(err)
 		}
 	}
 }
@@ -138,7 +145,5 @@ func (self *RemoteOffsetStore) updateOffset(mq *MessageQueue, offset int64, incr
 				self.offsetTableLock.Unlock()
 			}
 		}
-
 	}
-
 }

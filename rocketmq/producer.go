@@ -5,103 +5,35 @@ import (
 	"os"
 	"strconv"
 	"time"
+
+	"github.com/powxiao/go-rocketmq/rocketmq/header"
 )
 
 /*
 1. 每次消息会发送失败或者超时，会重试（上限15次）
 2.
+
+producer.setNamesrvAddr("127.0.0.1:9876");
+message = new Message(topic, new byte[] {'a'});
+producer.start()
+getMQClientFactory().registerProducer
+createTopicRoute()
+SendResult sendResult = producer.send(message);
+
+SendMessageRequestHeader
+CommunicationMode
+TopicRoute:BrokerData/queueData
+
+SelectMessageQueueByHash
 */
 
 type SendCallBack interface {
 	OnSuccess(result *SendResult)
 }
 
-//SendMessageRequestHeader of CustomerHeader
-type SendMessageRequestHeader struct {
-	ProducerGroup         string `json:"producerGroup"`
-	Topic                 string `json:"topic"`
-	DefaultTopic          string `json:"defaultTopic"`
-	DefaultTopicQueueNums int    `json:"defaultTopicQueueNums"`
-	QueueId               int32  `json:"queueId"`
-	SysFlag               int    `json:"sysFlag"`
-	BornTimestamp         int64  `json:"bornTimestamp"`
-	Flag                  int32  `json:"flag"`
-	Properties            string `json:"properties"`
-	ReconsumeTimes        int    `json:"reconsumeTimes"`
-	UnitMode              bool   `json:"unitMode"`
-	MaxReconsumeTimes     int    `json:"maxReconsumeTimes"`
-}
-
-func (s *SendMessageRequestHeader) FromMap(headerMap map[string]interface{}) {
-	return
-}
-
-/**
-{
-    "MSG_REGION": "DefaultRegion",
-    "TRACE_ON": "true",
-    "msgId": "C0A8000200002A9F0000000039FA93B5",
-    "queueId": "3",
-    "queueOffset": "1254671"
-}
-*/
-
-//SendMessageResponseHeader of CustomerHeader
-type SendMessageResponseHeader struct {
-	MsgId         string
-	QueueId       int32
-	QueueOffset   int64
-	TransactionId string
-	MsgRegion     string
-}
-
-func CurrentTimeMillisInt64() (ret int64) {
-	ret = time.Now().UnixNano() / 1000000
-	return
-}
-
-//NAME_VALUE_SEPARATOR char 1 and 2 from java code
-var NAME_VALUE_SEPARATOR = string(rune(1))
-
-//PROPERTY_SEPARATOR property separator
-var PROPERTY_SEPARATOR = string(rune(2))
-
-//MessageProperties2String convert message properties to string
-func MessageProperties2String(propertiesMap map[string]string) (ret string) {
-	for key, value := range propertiesMap {
-		ret = ret + key + NAME_VALUE_SEPARATOR + value + PROPERTY_SEPARATOR
-	}
-	return
-}
-
-//FromMap convert map[string]interface to struct
-func (s *SendMessageResponseHeader) FromMap(headerMap map[string]interface{}) {
-	s.MsgId = headerMap["msgId"].(string)
-	queueID, err := strconv.ParseInt(headerMap["queueId"].(string), 10, 32)
-	if err != nil {
-		queueID = -1
-	}
-	s.QueueId = int32(queueID)
-	queueOffset, err := strconv.ParseInt(headerMap["queueOffset"].(string), 10, 64)
-	if err != nil {
-		queueOffset = -1
-	}
-	s.QueueOffset = queueOffset
-	transactionId := headerMap["transactionId"]
-	if transactionId != nil {
-		s.TransactionId = headerMap["transactionId"].(string)
-	}
-	msgRegion := headerMap["MSG_REGION"]
-	if msgRegion != nil {
-		s.MsgRegion = headerMap["MSG_REGION"].(string)
-	}
-	return
-}
-
 type Producer interface {
 	Start() error
 	ShutDown()
-	//send message,default timeout is 3000
 	Send(msg *MessageExt) (sendResult *SendResult, err error)
 	SendAsync(msg *MessageExt, sendCallBack SendCallBack)
 	SendOneWay(msg *MessageExt)
@@ -243,7 +175,7 @@ func (d *DefaultProducer) doSendMessage(msg *MessageExt, messageQueue MessageQue
 		return
 	}
 	msg.GeneratorMsgUniqueKey()
-	sendMessageHeader := &SendMessageRequestHeader{
+	sendMessageHeader := &header.SendMessageRequestHeader{
 		ProducerGroup:         d.producerGroup,
 		Topic:                 msg.Topic,
 		DefaultTopic:          DEFAULT_TOPIC,

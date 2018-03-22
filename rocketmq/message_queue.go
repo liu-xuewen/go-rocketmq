@@ -1,5 +1,9 @@
 package rocketmq
 
+/*
+AllocateMessageQueueStrategy allocateMessageQueueConsistentHash = new AllocateMessageQueueConsistentHash(3)
+*/
+
 type MessageQueue struct {
 	topic      string
 	brokerName string

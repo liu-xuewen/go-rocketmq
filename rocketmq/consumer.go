@@ -7,6 +7,10 @@ import (
 	"strconv"
 	"sync/atomic"
 	"time"
+
+	"log"
+
+	"github.com/powxiao/go-rocketmq/rocketmq/header"
 )
 
 const (
@@ -27,6 +31,53 @@ type Config struct {
 	InstanceName string
 }
 
+/*
+listener:
+MessageListenerOrderly
+MessageListenerConcurrently
+
+
+DefaultMQPullConsumerImpl
+		pullConsumer = new DefaultMQPullConsumer(consumerGroup);
+        pullConsumer.setNamesrvAddr("127.0.0.1:9876");
+        pullConsumer.start();
+		findBrokerAddressInSubscribe
+		PullMessageRequestHeader
+		MessageQueue messageQueue = new MessageQueue(topic, brokerName, 0);
+		pullConsumer.pull(messageQueue, "*", 1024, 3);
+		pullConsumer.pull(messageQueue, "*", 1024, 3, new PullCallBack() {
+		});
+
+
+
+DefaultMQPushConsumerImpl
+		pushConsumer = new DefaultMQPushConsumer(consumerGroup);
+        pushConsumer.setNamesrvAddr("127.0.0.1:9876");
+		pushConsumer.setPullInterval(60 * 1000);
+        pushConsumer.registerMessageListener(new MessageListenerConcurrently() {
+            ...
+        });
+		pushConsumer.set(rebalancePushImpl)
+		pushConsumer.subscribe(topic, "*");
+        pushConsumer.start();
+		mQClientFactory.registerConsumer(consumerGroup, pushConsumerImpl);
+		PullMessageRequestHeader
+		createPullResult
+		findBrokerAddressInSubscribe
+		findConsumerIdList
+		updateTopicSubscribeInfo
+		ConsumeMessageConcurrentlyService
+		pullMessageService.executePullRequestImmediately(createPullRequest())
+
+RebalancePush topicSubscribeInfoTable
+        RebalancePushImpl rebalancePush = new RebalancePushImpl(consumerGroup, MessageModel.CLUSTERING,
+            new AllocateMessageQueueAveragely(), mqClientInstance, defaultMQPushConsumer);
+
+ProcessQueue
+	PutMessage/ TakeMessage/ RemoveMessage
+	fillProcessQueueInfo
+
+*/
 type Consumer interface {
 	//Admin
 	Start() error
@@ -139,6 +190,20 @@ func (self *DefaultConsumer) fetchSubscribeMessageQueues(topic string) error {
 	return nil
 }
 
+func (slef *DefaultConsumer) parseNextBeginOffset(responseCommand *RemotingCommand) (nextBeginOffset int64) {
+	var err error
+	pullResult := responseCommand.ExtFields
+	if nextBeginOffsetInter, ok := pullResult["nextBeginOffset"]; ok {
+		if nextBeginOffsetStr, ok := nextBeginOffsetInter.(string); ok {
+			nextBeginOffset, err = strconv.ParseInt(nextBeginOffsetStr, 10, 64)
+			if err != nil {
+				panic(err)
+			}
+		}
+	}
+	return
+}
+
 func (self *DefaultConsumer) pullMessage(pullRequest *PullRequest) {
 
 	commitOffsetEnable := false
@@ -166,7 +231,7 @@ func (self *DefaultConsumer) pullMessage(pullRequest *PullRequest) {
 		sysFlag |= FLAG_SUBSCRIPTION
 	}
 
-	requestHeader := new(PullMessageRequestHeader)
+	requestHeader := new(header.PullMessageRequestHeader)
 	requestHeader.ConsumerGroup = pullRequest.consumerGroup
 	requestHeader.Topic = pullRequest.messageQueue.topic
 	requestHeader.QueueId = pullRequest.messageQueue.queueId
@@ -187,50 +252,27 @@ func (self *DefaultConsumer) pullMessage(pullRequest *PullRequest) {
 		if responseFuture != nil {
 			responseCommand := responseFuture.responseCommand
 			if responseCommand.Code == SUCCESS && len(responseCommand.Body) > 0 {
-				var err error
-				pullResult := responseCommand.ExtFields
-				if nextBeginOffsetInter, ok := pullResult["nextBeginOffset"]; ok {
-					if nextBeginOffsetStr, ok := nextBeginOffsetInter.(string); ok {
-						nextBeginOffset, err = strconv.ParseInt(nextBeginOffsetStr, 10, 64)
-						if err != nil {
-							Println(err)
-							return
-						}
 
-					}
-
-				}
 				msgs := decodeMessage(responseFuture.responseCommand.Body)
-				err = self.messageListener(msgs)
+				err := self.messageListener(msgs)
 				if err != nil {
-					Println(err)
+					log.Println(err)
 					//TODO retry
 				} else {
 					self.offsetStore.updateOffset(pullRequest.messageQueue, nextBeginOffset, false)
 				}
 			} else if responseCommand.Code == PULL_NOT_FOUND {
 			} else if responseCommand.Code == PULL_RETRY_IMMEDIATELY || responseCommand.Code == PULL_OFFSET_MOVED {
-				Printf("pull message error,code=%d,request=%v", responseCommand.Code, requestHeader)
-				var err error
-				pullResult := responseCommand.ExtFields
-				if nextBeginOffsetInter, ok := pullResult["nextBeginOffset"]; ok {
-					if nextBeginOffsetStr, ok := nextBeginOffsetInter.(string); ok {
-						nextBeginOffset, err = strconv.ParseInt(nextBeginOffsetStr, 10, 64)
-						if err != nil {
-							Println(err)
-						}
-
-					}
-
-				}
+				log.Printf("pull message error,code=%d,request=%v", responseCommand.Code, requestHeader)
+				nextBeginOffset = self.parseNextBeginOffset(responseCommand)
 				//time.Sleep(1 * time.Second)
 			} else {
-				Println(fmt.Sprintf("pull message error,code=%d,body=%s", responseCommand.Code, string(responseCommand.Body)))
-				Println(pullRequest.messageQueue)
+				log.Println(fmt.Sprintf("pull message error,code=%d,body=%s", responseCommand.Code, string(responseCommand.Body)))
+				log.Println(pullRequest.messageQueue)
 				time.Sleep(1 * time.Second)
 			}
 		} else {
-			Println("responseFuture is nil")
+			log.Println("responseFuture is nil")
 		}
 
 		nextPullRequest := &PullRequest{

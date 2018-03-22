@@ -14,6 +14,15 @@ type SubscriptionData struct {
 	CodeSet         []string
 	SubVersion      int64
 }
+
+/*
+AllocateMessageQueueStrategy
+	AllocateMessageQueueAveragely
+	AllocateMessageQueueConsistentHash
+	AllocateMessageQueueAveragely
+	AllocateMessageQueueByConfig
+	AllocateMessageQueueByMachineRoom
+*/
 type Rebalance struct {
 	groupName                    string
 	messageModel                 string

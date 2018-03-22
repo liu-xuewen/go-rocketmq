@@ -9,56 +9,20 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/powxiao/go-rocketmq/rocketmq/header"
 )
 
-const (
-	//MESSAGE_COMPRESS_LEVEL      MESSAGE_COMPRESS_LEVEL
-	MESSAGE_COMPRESS_LEVEL = "rocketmq.message.compressLevel"
-	//DEFAULT_TOPIC               DEFAULT_TOPIC
-	DEFAULT_TOPIC = "TBW102"
-	//CLIENT_INNER_PRODUCER_GROUP CLIENT_INNER_PRODUCER_GROUP
-	CLIENT_INNER_PRODUCER_GROUP = "CLIENT_INNER_PRODUCER"
+/*
+sendMessageOneWay
+SendResult sendResult = mqClientAPI.sendMessage(brokerAddr, brokerName, msg, new SendMessageRequestHeader(),
+    3 * 1000, CommunicationMode.ONEWAY, new SendMessageContext(), defaultMQProducerImpl);
 
-	//MASTER_ID MASTER_ID
-	MASTER_ID int64 = 0
-	//CURRENT_JVM_PID CURRENT_JVM_PID
-	CURRENT_JVM_PID
-	//RETRY_GROUP_TOPIC_PREFIX RETRY_GROUP_TOPIC_PREFIX
-	RETRY_GROUP_TOPIC_PREFIX = "%RETRY%"
-	//DLQ_GROUP_TOPIC_PREFIX     DLQ_GROUP_TOPIC_PREFIX
-	DLQ_GROUP_TOPIC_PREFIX = "%DLQ%"
-	//SYSTEM_TOPIC_PREFIX        SYSTEM_TOPIC_PREFIX
-	SYSTEM_TOPIC_PREFIX = "rmq_sys_"
-	//UNIQUE_MSG_QUERY_FLAG      UNIQUE_MSG_QUERY_FLAG
-	UNIQUE_MSG_QUERY_FLAG = "_UNIQUE_KEY_QUERY"
-	//MAX_MESSAGE_BODY_SIZE  MAX_MESSAGE_BODY_SIZE
-	MAX_MESSAGE_BODY_SIZE int = 4 * 1024 * 1024 //4m
-	//MAX_MESSAGE_TOPIC_SIZE MAX_MESSAGE_TOPIC_SIZE
-	MAX_MESSAGE_TOPIC_SIZE int = 255 //255char
-	//DEFAULT_TOPIC_QUEUE_NUMS DEFAULT_TOPIC_QUEUE_NUMS
-	DEFAULT_TOPIC_QUEUE_NUMS int32 = 4
-)
+sendMessageAsync
+*/
 
 //DEFAULT_TIMEOUT rocketmq client's default timeout
 var DEFAULT_TIMEOUT int64 = 3000
-
-//GetRouteInfoRequestHeader of CustomerHeader
-type GetRouteInfoRequestHeader struct {
-	Topic string `json:"topic"`
-}
-
-//FromMap convert map[string]interface to struct
-func (g *GetRouteInfoRequestHeader) FromMap(headerMap map[string]interface{}) {
-	return
-}
-
-//func (self *GetRouteInfoRequestHeader) MarshalJSON() ([]byte, error) {
-//	var buf bytes.Buffer
-//	buf.WriteString("{\"topic\":\"")
-//	buf.WriteString(self.topic)
-//	buf.WriteString("\"}")
-//	return buf.Bytes(), nil
-//}
 
 type QueueData struct {
 	BrokerName     string
@@ -365,16 +329,8 @@ func (self *MqClient) findConsumerIdList(topic string, groupName string) ([]stri
 
 }
 
-type GetConsumerListByGroupRequestHeader struct {
-	ConsumerGroup string `json:"consumerGroup"`
-}
-
-type GetConsumerListByGroupResponseBody struct {
-	ConsumerIdList []string
-}
-
 func (self *MqClient) getConsumerIdListByGroup(addr string, consumerGroup string, timeoutMillis int64) ([]string, error) {
-	requestHeader := new(GetConsumerListByGroupRequestHeader)
+	requestHeader := new(header.GetConsumerListByGroupRequestHeader)
 	requestHeader.ConsumerGroup = consumerGroup
 
 	currOpaque := atomic.AddInt32(&opaque, 1)
@@ -394,7 +350,7 @@ func (self *MqClient) getConsumerIdListByGroup(addr string, consumerGroup string
 	}
 
 	if response.Code == SUCCESS {
-		getConsumerListByGroupResponseBody := new(GetConsumerListByGroupResponseBody)
+		getConsumerListByGroupResponseBody := new(header.GetConsumerListByGroupResponseBody)
 		bodyjson := strings.Replace(string(response.Body), "0:", "\"0\":", -1)
 		bodyjson = strings.Replace(bodyjson, "1:", "\"1\":", -1)
 		err := json.Unmarshal([]byte(bodyjson), getConsumerListByGroupResponseBody)
@@ -409,7 +365,7 @@ func (self *MqClient) getConsumerIdListByGroup(addr string, consumerGroup string
 }
 
 func (self *MqClient) getTopicRouteInfoFromNameServer(topic string, timeoutMillis int64) (*TopicRouteData, error) {
-	requestHeader := &GetRouteInfoRequestHeader{
+	requestHeader := &header.GetRouteInfoRequestHeader{
 		Topic: topic,
 	}
 	var remotingCommand = NewRemotingCommand(GET_ROUTEINTO_BY_TOPIC, requestHeader)
