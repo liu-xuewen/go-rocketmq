@@ -195,7 +195,7 @@ func (d *DefaultProducer) Send(msg *MessageExt) (sendResult *SendResult, err err
 		begin := time.Now()
 		sendResult, err = d.doSendMessage(msg, messageQueue, communicationMode, nil, topicPublishInfo, int64(timeout))
 		end := time.Now().Sub(begin)
-		Printf("send message cost %#v(s)", end.Seconds())
+		Printf("send message cost %v(s)", end.Seconds())
 		switch communicationMode {
 		case "Async":
 			return

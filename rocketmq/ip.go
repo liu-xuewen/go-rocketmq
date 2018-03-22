@@ -14,7 +14,7 @@ var (
 )
 
 func init() {
-	logger = log.New(os.Stdout, "[rocketMQ]", log.Ldate|log.Ltime|log.Lshortfile)
+	logger = log.New(os.Stdout, "[rocketMQ]", log.Ldate|log.Ltime)
 	flag.BoolVar(&debug, "debug", false, "set this true to output debug log")
 	flag.Parse()
 }
