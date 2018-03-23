@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"encoding/json"
 	"errors"
+	"log"
 	"net"
 	"sync"
 	"time"
@@ -56,7 +57,7 @@ func (self *DefalutRemotingClient) ScanResponseTable() {
 
 			if response.invokeCallback != nil {
 				response.invokeCallback(nil)
-				Printf("remove time out request %v", response)
+				log.Printf("remove time out request %v", response)
 			}
 		}
 	}
@@ -75,14 +76,14 @@ func (self *DefalutRemotingClient) connect(addr string) (conn net.Conn, err erro
 	if !ok {
 		conn, err = net.Dial("tcp", addr)
 		if err != nil {
-			Println(err)
+			log.Println(err)
 			return nil, err
 		}
 
 		self.connTableLock.Lock()
 		self.connTable[addr] = conn
 		self.connTableLock.Unlock()
-		Println("connect to:", addr)
+		log.Println("connect to:", addr)
 		go self.handlerConn(conn, addr)
 	}
 
@@ -98,7 +99,7 @@ func (self *DefalutRemotingClient) invokeSync(addr string, request *RemotingComm
 	if !ok {
 		conn, err = self.connect(addr)
 		if err != nil {
-			Println(err)
+			log.Println(err)
 			return nil, err
 		}
 	}
@@ -119,7 +120,7 @@ func (self *DefalutRemotingClient) invokeSync(addr string, request *RemotingComm
 	self.responseTableLock.Unlock()
 	err = self.sendRequest(header, body, conn, addr)
 	if err != nil {
-		Println(err)
+		log.Println(err)
 		return nil, err
 	}
 	select {
@@ -140,7 +141,7 @@ func (self *DefalutRemotingClient) invokeAsync(addr string, request *RemotingCom
 	if !ok {
 		conn, err = self.connect(addr)
 		if err != nil {
-			Println(err)
+			log.Println(err)
 			return err
 		}
 	}
@@ -161,7 +162,7 @@ func (self *DefalutRemotingClient) invokeAsync(addr string, request *RemotingCom
 	body := request.Body
 	err = self.sendRequest(header, body, conn, addr)
 	if err != nil {
-		Println(err)
+		log.Println(err)
 		return err
 	}
 	return nil
@@ -181,7 +182,7 @@ func (self *DefalutRemotingClient) handlerConn(conn net.Conn, addr string) {
 		n, err := conn.Read(b)
 		if err != nil {
 			self.releaseConn(addr, conn)
-			Println(err, addr)
+			log.Println(err, addr)
 
 			return
 		}
@@ -197,7 +198,7 @@ func (self *DefalutRemotingClient) handlerConn(conn net.Conn, addr string) {
 				if buf.Len() >= 4 {
 					err = binary.Read(buf, binary.BigEndian, &length)
 					if err != nil {
-						Println(err)
+						log.Println(err)
 						return
 					}
 					flag = 1
@@ -210,7 +211,7 @@ func (self *DefalutRemotingClient) handlerConn(conn net.Conn, addr string) {
 				if buf.Len() >= 4 {
 					err = binary.Read(buf, binary.BigEndian, &headerLength)
 					if err != nil {
-						Println(err)
+						log.Println(err)
 						return
 					}
 					flag = 2
@@ -225,7 +226,7 @@ func (self *DefalutRemotingClient) handlerConn(conn net.Conn, addr string) {
 					header = make([]byte, headerLength)
 					_, err = buf.Read(header)
 					if err != nil {
-						Println(err)
+						log.Println(err)
 						return
 					}
 					flag = 3
@@ -244,7 +245,7 @@ func (self *DefalutRemotingClient) handlerConn(conn net.Conn, addr string) {
 						body = make([]byte, int(bodyLength))
 						_, err = buf.Read(body)
 						if err != nil {
-							Println(err)
+							log.Println(err)
 							return
 						}
 						flag = 0
@@ -283,11 +284,10 @@ func (self *DefalutRemotingClient) handlerConn(conn net.Conn, addr string) {
 							return
 						}
 						jsonCmd, err := json.Marshal(cmd)
-
 						if err != nil {
-							Println(err)
+							log.Println(err)
 						}
-						Println(string(jsonCmd))
+						log.Println("jsonCmd:", string(jsonCmd))
 					}
 				}()
 			}

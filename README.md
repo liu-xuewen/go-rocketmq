@@ -4,7 +4,7 @@
 import	"github.com/powxiao/rocketmq"
 
 # example
-* 见example.go
+* main.go
 
 # feature plan
 ## producer

@@ -252,7 +252,7 @@ func (self *DefaultConsumer) pullMessage(pullRequest *PullRequest) {
 		if responseFuture != nil {
 			responseCommand := responseFuture.responseCommand
 			if responseCommand.Code == SUCCESS && len(responseCommand.Body) > 0 {
-
+				nextBeginOffset = self.parseNextBeginOffset(responseCommand)
 				msgs := decodeMessage(responseFuture.responseCommand.Body)
 				err := self.messageListener(msgs)
 				if err != nil {

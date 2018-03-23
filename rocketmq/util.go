@@ -3,6 +3,7 @@ package rocketmq
 import (
 	"bytes"
 	"compress/zlib"
+	"log"
 	"net"
 	"strings"
 	"time"
@@ -130,6 +131,11 @@ const (
 	DEFAULT_TOPIC_QUEUE_NUMS int32 = 4
 )
 
+func init() {
+	log.SetFlags(log.LstdFlags | log.Lshortfile | log.Lmicroseconds)
+	log.SetPrefix("[rocketMQ]")
+}
+
 //CompressWithLevel compress byte array with level
 func CompressWithLevel(body []byte, level int) (compressBody []byte, err error) {
 	var (
@@ -145,9 +151,6 @@ func CompressWithLevel(body []byte, level int) (compressBody []byte, err error) 
 	compressBody = in.Bytes()
 	return
 }
-
-//logger = log.New(os.Stdout, "[rocketMQ]", log.Ldate|log.Ltime)
-//flag.BoolVar(&debug, "debug", false, "set this true to output debug log")
 
 //GetIp4Bytes get ip4 byte array
 func GetIp4Bytes() (ret []byte) {

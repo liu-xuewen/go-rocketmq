@@ -2,6 +2,7 @@ package rocketmq
 
 import (
 	"errors"
+	"log"
 	"os"
 	"strconv"
 	"time"
@@ -124,10 +125,7 @@ func (d *DefaultProducer) Send(msg *MessageExt) (sendResult *SendResult, err err
 		if err != nil {
 			return
 		}
-		begin := time.Now()
 		sendResult, err = d.doSendMessage(msg, messageQueue, communicationMode, nil, topicPublishInfo, int64(timeout))
-		end := time.Now().Sub(begin)
-		Printf("send message cost %v(s)", end.Seconds())
 		switch communicationMode {
 		case "Async":
 			return
@@ -217,7 +215,7 @@ func (d *DefaultProducer) doSendMessage(msg *MessageExt, messageQueue MessageQue
 		var response *RemotingCommand
 		response, err = remoteClient.invokeSync(brokerAddr, remotingCommand, timeout)
 		if err != nil {
-			Println(err)
+			log.Println(err)
 			return
 		}
 		sendResult, err = processSendResponse(messageQueue.brokerName, msg, response)
@@ -225,16 +223,16 @@ func (d *DefaultProducer) doSendMessage(msg *MessageExt, messageQueue MessageQue
 	case "OneWay":
 		err = remoteClient.invokeOneWay(brokerAddr, remotingCommand, timeout)
 		if err != nil {
-			Println(err)
+			log.Println(err)
 			return
 		}
 		break
 	default:
-		Printf("unknown producer communicate mode")
+		log.Printf("unknown producer communicate mode")
 		break
 	}
 	if err != nil {
-		Println(err)
+		log.Println(err)
 		return
 	}
 	return
@@ -268,7 +266,7 @@ func processSendResponse(brokerName string, message *MessageExt,
 		err = errors.New("response.Code error_code=" + strconv.Itoa(int(response.Code)))
 		return
 	}
-	var responseHeader = &SendMessageResponseHeader{}
+	var responseHeader = &header.SendMessageResponseHeader{}
 	if response.ExtFields != nil {
 		responseHeader.FromMap(response.ExtFields) //change map[string]interface{} into CustomerHeader struct
 	}

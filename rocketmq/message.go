@@ -6,6 +6,7 @@ import (
 	"encoding/binary"
 	"encoding/json"
 	"io/ioutil"
+	"log"
 )
 
 const (
@@ -92,13 +93,13 @@ func decodeMessage(data []byte) []*MessageExt {
 				b := bytes.NewReader(body)
 				z, err := zlib.NewReader(b)
 				if err != nil {
-					Println(err)
+					log.Println(err)
 					return nil
 				}
 				defer z.Close()
 				body, err = ioutil.ReadAll(z)
 				if err != nil {
-					Println(err)
+					log.Println(err)
 					return nil
 				}
 			}
@@ -116,7 +117,7 @@ func decodeMessage(data []byte) []*MessageExt {
 		}
 
 		if magicCode != -626843481 {
-			Printf("magic code is error %d", magicCode)
+			log.Printf("magic code is error %d", magicCode)
 			return nil
 		}
 
