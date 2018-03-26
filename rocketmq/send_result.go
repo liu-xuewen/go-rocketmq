@@ -30,5 +30,5 @@ type SendResult struct {
 
 func (s *SendResult) String() string {
 	return fmt.Sprintf("sendStatus:%v, msgID:%v, topic:%v, queueId:%v, brokerName:%v",
-		s.sendStatus, s.msgID, s.messageQueue.topic, s.messageQueue.queueId, s.messageQueue.brokerName)
+		s.sendStatus, s.msgID, s.messageQueue.Topic, s.messageQueue.QueueId, s.messageQueue.BrokerName)
 }

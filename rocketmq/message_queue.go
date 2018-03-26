@@ -5,16 +5,16 @@ AllocateMessageQueueStrategy allocateMessageQueueConsistentHash = new AllocateMe
 */
 
 type MessageQueue struct {
-	topic      string
-	brokerName string
-	queueId    int32
+	Topic      string
+	BrokerName string
+	QueueId    int32
 }
 
 func (self *MessageQueue) clone() *MessageQueue {
 	no := new(MessageQueue)
-	no.topic = self.topic
-	no.queueId = self.queueId
-	no.brokerName = self.brokerName
+	no.Topic = self.Topic
+	no.QueueId = self.QueueId
+	no.BrokerName = self.BrokerName
 	return no
 }
 
@@ -24,19 +24,19 @@ func (self MessageQueues) Less(i, j int) bool {
 	imq := self[i]
 	jmq := self[j]
 
-	if imq.topic < jmq.topic {
+	if imq.Topic < jmq.Topic {
 		return true
-	} else if imq.topic < jmq.topic {
+	} else if imq.Topic < jmq.Topic {
 		return false
 	}
 
-	if imq.brokerName < jmq.brokerName {
+	if imq.BrokerName < jmq.BrokerName {
 		return true
-	} else if imq.brokerName < jmq.brokerName {
+	} else if imq.BrokerName < jmq.BrokerName {
 		return false
 	}
 
-	if imq.queueId < jmq.queueId {
+	if imq.QueueId < jmq.QueueId {
 		return true
 	} else {
 		return false

@@ -4,6 +4,7 @@ import (
 	"errors"
 	"log"
 	"sort"
+	"strings"
 	"sync"
 )
 
@@ -150,6 +151,7 @@ func (self *Rebalance) rebalanceByTopic(topic string) error {
 			sort.Sort(consumerIdSorter)
 		}
 
+		//选择message queue
 		allocateResult, err := self.allocateMessageQueueStrategy.allocate(self.groupName, self.mqClient.clientId, mqs, cidAll)
 
 		if err != nil {
@@ -186,11 +188,39 @@ func (self *Rebalance) updateProcessQueueTableInRebalance(topic string, mqSet []
 func (self *Rebalance) computePullFromWhere(mq *MessageQueue) int64 {
 	var result int64 = -1
 	lastOffset := self.consumer.offsetStore.readOffset(mq, READ_FROM_STORE)
+	switch self.consumer.consumeFromWhere {
+	case CONSUME_FROM_LAST_OFFSET:
+		if lastOffset >= 0 {
+			result = lastOffset
+		} else {
+			if strings.HasPrefix(mq.Topic, RETRY_GROUP_TOPIC_PREFIX) {
+				result = 0
+			} else {
+				result = self.mqClient.getMaxOffset(mq)
+			}
+		}
+		break
+	case CONSUME_FROM_FIRST_OFFSET:
+		if lastOffset >= 0 {
+			result = lastOffset
+		} else {
+			result = 0 // use the begin offset
+		}
+		break
+	case CONSUME_FROM_TIMESTAMP:
+		if lastOffset >= 0 {
+			result = lastOffset
+		} else {
+			if strings.HasPrefix(mq.Topic, RETRY_GROUP_TOPIC_PREFIX) {
+				result = 0
+			} else {
+				result = self.mqClient.searchOffset(mq, self.consumer.consumeTimeStamp)
+			}
+		}
+		break
+	default:
 
-	if lastOffset >= 0 {
-		result = lastOffset
-	} else {
-		result = 0
 	}
+
 	return result
 }

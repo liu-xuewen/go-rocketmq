@@ -131,6 +131,20 @@ const (
 	DEFAULT_TOPIC_QUEUE_NUMS int32 = 4
 )
 
+//ConsumeFromWhere consume from where
+type ConsumeFromWhere int
+
+const (
+	//CONSUME_FROM_LAST_OFFSET first consume from the last offset
+	CONSUME_FROM_LAST_OFFSET ConsumeFromWhere = iota
+
+	//CONSUME_FROM_FIRST_OFFSET first consume from the first offset
+	CONSUME_FROM_FIRST_OFFSET
+
+	//CONSUME_FROM_TIMESTAMP first consume from the time
+	CONSUME_FROM_TIMESTAMP
+)
+
 func init() {
 	log.SetFlags(log.LstdFlags | log.Lshortfile | log.Lmicroseconds)
 	log.SetPrefix("[rocketMQ]")

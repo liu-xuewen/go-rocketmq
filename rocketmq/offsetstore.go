@@ -14,13 +14,8 @@ const (
 )
 
 type OffsetStore interface {
-	//load() error
 	updateOffset(mq *MessageQueue, offset int64, increaseOnly bool)
 	readOffset(mq *MessageQueue, flag int) int64
-	//persistAll(mqs []MessageQueue)
-	//persist(mq MessageQueue)
-	//removeOffset(mq MessageQueue)
-	//cloneOffsetTable(topic string) map[MessageQueue]int64
 }
 
 /*
@@ -36,7 +31,6 @@ type RemoteOffsetStore struct {
 }
 
 func (self *RemoteOffsetStore) readOffset(mq *MessageQueue, readType int) int64 {
-
 	switch readType {
 	case MEMORY_FIRST_THEN_STORE:
 	case READ_FROM_MEMORY:
@@ -64,64 +58,24 @@ func (self *RemoteOffsetStore) readOffset(mq *MessageQueue, readType int) int64 
 }
 
 func (self *RemoteOffsetStore) fetchConsumeOffsetFromBroker(mq *MessageQueue) (int64, error) {
-	brokerAddr, _, found := self.mqClient.findBrokerAddressInSubscribe(mq.brokerName, 0, false)
+	brokerAddr, _, found := self.mqClient.findBrokerAddressInSubscribe(mq.BrokerName, 0, false)
 
 	if !found {
-		if err := self.mqClient.updateTopicRouteInfoFromNameServerByTopic(mq.topic); err != nil {
+		if err := self.mqClient.updateTopicRouteInfoFromNameServerByTopic(mq.Topic); err != nil {
 			return 0, err
 		}
-		brokerAddr, _, found = self.mqClient.findBrokerAddressInSubscribe(mq.brokerName, 0, false)
+		brokerAddr, _, found = self.mqClient.findBrokerAddressInSubscribe(mq.BrokerName, 0, false)
 	}
 
 	if found {
 		requestHeader := &QueryConsumerOffsetRequestHeader{}
-		requestHeader.Topic = mq.topic
-		requestHeader.QueueId = mq.queueId
+		requestHeader.Topic = mq.Topic
+		requestHeader.QueueId = mq.QueueId
 		requestHeader.ConsumerGroup = self.groupName
 		return self.mqClient.queryConsumerOffset(brokerAddr, requestHeader, 3000)
 	}
 
 	return 0, errors.New("fetch consumer offset error")
-}
-
-func (self *RemoteOffsetStore) persist(mq *MessageQueue) {
-	offset, ok := self.offsetTable[*mq]
-	if ok {
-		err := self.updateConsumeOffsetToBroker(mq, offset)
-		if err != nil {
-			log.Println(err)
-		}
-	}
-}
-
-type UpdateConsumerOffsetRequestHeader struct {
-	consumerGroup string
-	topic         string
-	queueId       int32
-	commitOffset  int64
-}
-
-func (self *RemoteOffsetStore) updateConsumeOffsetToBroker(mq *MessageQueue, offset int64) error {
-	addr, found, _ := self.mqClient.findBrokerAddressInSubscribe(mq.brokerName, 0, false)
-	if !found {
-		if err := self.mqClient.updateTopicRouteInfoFromNameServerByTopic(mq.topic); err != nil {
-			return err
-		}
-		addr, found, _ = self.mqClient.findBrokerAddressInSubscribe(mq.brokerName, 0, false)
-	}
-
-	if found {
-		requestHeader := &UpdateConsumerOffsetRequestHeader{
-			consumerGroup: self.groupName,
-			topic:         mq.topic,
-			queueId:       mq.queueId,
-			commitOffset:  offset,
-		}
-
-		self.mqClient.updateConsumerOffsetOneway(addr, requestHeader, 5*1000)
-		return nil
-	}
-	return errors.New("not found broker")
 }
 
 func (self *RemoteOffsetStore) updateOffset(mq *MessageQueue, offset int64, increaseOnly bool) {

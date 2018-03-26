@@ -276,7 +276,7 @@ func (d *DefaultProducer) doSendMessage(msg *MessageExt, messageQueue MessageQue
 		Topic:                 msg.Topic,
 		DefaultTopic:          DEFAULT_TOPIC,
 		DefaultTopicQueueNums: 4,
-		QueueId:               messageQueue.queueId,
+		QueueId:               messageQueue.QueueId,
 		SysFlag:               sysFlag,
 		BornTimestamp:         CurrentTimeMillisInt64(),
 		Flag:                  msg.Flag,
@@ -285,9 +285,9 @@ func (d *DefaultProducer) doSendMessage(msg *MessageExt, messageQueue MessageQue
 		//ReconsumeTimes:        msg.GetReconsumeTimes(),
 		//MaxReconsumeTimes:     msg.GetMaxReconsumeTimes(),
 	}
-	brokerAddr = d.mqClient.fetchMasterBrokerAddress(messageQueue.brokerName)
+	brokerAddr = d.mqClient.fetchMasterBrokerAddress(messageQueue.BrokerName)
 	if brokerAddr == "" {
-		err = errors.New("The broker[" + messageQueue.brokerName + "] not exist")
+		err = errors.New("The broker[" + messageQueue.BrokerName + "] not exist")
 		return
 	}
 
@@ -298,10 +298,10 @@ func (d *DefaultProducer) doSendMessage(msg *MessageExt, messageQueue MessageQue
 	case "Async":
 		err = remoteClient.invokeAsync(brokerAddr, remotingCommand, timeout, func(responseFuture *ResponseFuture) {
 			if sendCallback == nil && responseFuture.responseCommand != nil {
-				sendResult, err = processSendResponse(messageQueue.brokerName, msg, responseFuture.responseCommand)
+				sendResult, err = processSendResponse(messageQueue.BrokerName, msg, responseFuture.responseCommand)
 			}
 			if responseFuture.responseCommand != nil {
-				sendResult, err = processSendResponse(messageQueue.brokerName, msg, responseFuture.responseCommand)
+				sendResult, err = processSendResponse(messageQueue.BrokerName, msg, responseFuture.responseCommand)
 				if sendCallback != nil {
 					sendCallback.OnSuccess(sendResult)
 				}
@@ -316,7 +316,7 @@ func (d *DefaultProducer) doSendMessage(msg *MessageExt, messageQueue MessageQue
 			log.Println(err)
 			return
 		}
-		sendResult, err = processSendResponse(messageQueue.brokerName, msg, response)
+		sendResult, err = processSendResponse(messageQueue.BrokerName, msg, response)
 		break
 	case "OneWay":
 		err = remoteClient.invokeOneWay(brokerAddr, remotingCommand, timeout)
@@ -372,8 +372,8 @@ func processSendResponse(brokerName string, message *MessageExt,
 	sendResult.offsetMsgID = responseHeader.MsgId
 	sendResult.queueOffset = responseHeader.QueueOffset
 	sendResult.transactionID = responseHeader.TransactionId
-	messageQueue := MessageQueue{topic: message.Topic, brokerName: brokerName,
-		queueId: responseHeader.QueueId}
+	messageQueue := MessageQueue{Topic: message.Topic, BrokerName: brokerName,
+		QueueId: responseHeader.QueueId}
 	sendResult.messageQueue = messageQueue
 	var regionId = responseHeader.MsgRegion
 	if len(regionId) == 0 {
@@ -405,7 +405,7 @@ func selectOneMessageQueue(topicPublishInfo *TopicPublishInfo, lastFailedBroker 
 		if nowQueueIndex >= len(queues) {
 			nowQueueIndex = nowQueueIndex - len(queues)
 		}
-		if lastFailedBroker == queues[nowQueueIndex].brokerName {
+		if lastFailedBroker == queues[nowQueueIndex].BrokerName {
 			continue
 		}
 		mqQueue = queues[nowQueueIndex]

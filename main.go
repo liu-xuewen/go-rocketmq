@@ -16,6 +16,11 @@ import (
 1. 消费的时候没有获取到MsgId： decode message 需要设置msgID
 2. 生产者数据已经发送，但是不是立即消费： 不能立即获取到consumerID
 3. 怎么样才能获取ConsumerIDListByGroup成功:
+
+subscribe
+processQueue
+registerProcessor
+
 */
 var (
 	nameServerAddress = "127.0.0.1:9876" //address split by ;  (for example 192.168.1.1:9876;192.168.1.2:9876)

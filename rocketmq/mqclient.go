@@ -123,9 +123,9 @@ func BuildTopicSubscribeInfoFromRoteData(topic string, topicRouteData *TopicRout
 		var i int32
 		for i = 0; i < queueData.ReadQueueNums; i++ {
 			mq := &MessageQueue{
-				topic:      topic,
-				brokerName: queueData.BrokerName,
-				queueId:    i,
+				Topic:      topic,
+				BrokerName: queueData.BrokerName,
+				QueueId:    i,
 			}
 			mqList = append(mqList, mq)
 		}
@@ -150,7 +150,7 @@ func BuildTopicPublishInfoFromTopicRoteData(topic string, topicRouteData *TopicR
 				}
 				var i int32
 				for i = 0; i < queueData.WriteQueueNums; i++ {
-					messageQueue := MessageQueue{topic: topic, brokerName: queueData.BrokerName, queueId: i}
+					messageQueue := MessageQueue{Topic: topic, BrokerName: queueData.BrokerName, QueueId: i}
 					topicPublishInfo.MessageQueueList = append(topicPublishInfo.MessageQueueList, messageQueue)
 					topicPublishInfo.HaveTopicRouterInfo = true
 				}
@@ -413,9 +413,9 @@ func (self *MqClient) updateTopicRouteInfoFromNameServerByTopic(topic string) er
 		var i int32
 		for i = 0; i < queueData.ReadQueueNums; i++ {
 			mq := &MessageQueue{
-				topic:      topic,
-				brokerName: queueData.BrokerName,
-				queueId:    i,
+				Topic:      topic,
+				BrokerName: queueData.BrokerName,
+				QueueId:    i,
 			}
 
 			mqList = append(mqList, mq)
@@ -436,7 +436,7 @@ type ConsumerData struct {
 	GroupName           string
 	ConsumerType        string
 	MessageModel        string
-	ConsumeFromWhere    string
+	ConsumeFromWhere    ConsumeFromWhere
 	SubscriptionDataSet []*SubscriptionData
 	UnitMode            bool
 }
@@ -611,17 +611,43 @@ func (self *MqClient) queryConsumerOffset(addr string, requestHeader *QueryConsu
 	return 0, errors.New("query offset error")
 }
 
-func (self *MqClient) updateConsumerOffsetOneway(addr string, header *UpdateConsumerOffsetRequestHeader, timeoutMillis int64) {
-
-	currOpaque := atomic.AddInt32(&opaque, 1)
-	remotingCommand := &RemotingCommand{
-		Code:      QUERY_CONSUMER_OFFSET,
-		Language:  "JAVA",
-		Version:   79,
-		Opaque:    currOpaque,
-		Flag:      0,
-		ExtFields: Struct2Map(header),
-	}
-
+func (self *MqClient) updateConsumerOffsetOneway(addr string, updateConsumerOffset *header.UpdateConsumerOffsetRequestHeader, timeoutMillis int64) {
+	remotingCommand := NewRemotingCommand(QUERY_CONSUMER_OFFSET, updateConsumerOffset)
 	self.remotingClient.invokeSync(addr, remotingCommand, timeoutMillis)
+}
+
+func (self *MqClient) getMaxOffset(mq *MessageQueue) int64 {
+	brokerAddr := self.fetchMasterBrokerAddress(mq.BrokerName)
+	if len(brokerAddr) == 0 {
+		self.tryToFindTopicPublishInfo(mq.Topic)
+		brokerAddr = self.fetchMasterBrokerAddress(mq.BrokerName)
+	}
+	getMaxOffsetRequestHeader := &header.GetMaxOffsetRequestHeader{Topic: mq.Topic, QueueId: mq.QueueId}
+	remotingCmd := NewRemotingCommand(GET_MAX_OFFSET, getMaxOffsetRequestHeader)
+	response, err := self.remotingClient.invokeSync(brokerAddr, remotingCmd, DEFAULT_TIMEOUT)
+	if err != nil {
+		return -1
+	}
+	queryOffsetResponseHeader := header.QueryOffsetResponseHeader{}
+	queryOffsetResponseHeader.FromMap(response.ExtFields)
+	return queryOffsetResponseHeader.Offset
+}
+
+func (self *MqClient) searchOffset(mq *MessageQueue, time time.Time) int64 {
+	brokerAddr := self.fetchMasterBrokerAddress(mq.BrokerName)
+	if len(brokerAddr) == 0 {
+		self.tryToFindTopicPublishInfo(mq.Topic)
+		brokerAddr = self.fetchMasterBrokerAddress(mq.BrokerName)
+	}
+	timeStamp := CurrentTimeMillisInt64()
+	searchOffsetRequestHeader := &header.SearchOffsetRequestHeader{Topic: mq.Topic, QueueId: mq.QueueId, Timestamp: timeStamp}
+	remotingCmd := NewRemotingCommand(SEARCH_OFFSET_BY_TIMESTAMP, searchOffsetRequestHeader)
+	response, err := self.remotingClient.invokeSync(brokerAddr, remotingCmd, DEFAULT_TIMEOUT)
+	if err != nil {
+		return -1
+	}
+	queryOffsetResponseHeader := header.QueryOffsetResponseHeader{}
+
+	queryOffsetResponseHeader.FromMap(response.ExtFields)
+	return queryOffsetResponseHeader.Offset
 }

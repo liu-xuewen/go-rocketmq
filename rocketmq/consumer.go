@@ -90,14 +90,14 @@ type Consumer interface {
 	RegisterMessageListener(listener MessageListener)
 	Subscribe(topic string, subExpression string)
 	UnSubscribe(topic string)
-	SendMessageBack(msg MessageExt, delayLevel int) error //brokerName
-	fetchSubscribeMessageQueues(topic string) error
 }
+
+//fetchSubscribeMessageQueues(topic string) error
 
 type DefaultConsumer struct {
 	conf             *Config
 	consumerGroup    string
-	consumeFromWhere string
+	consumeFromWhere ConsumeFromWhere
 	consumerType     string
 	messageModel     string
 	unitMode         bool
@@ -107,9 +107,10 @@ type DefaultConsumer struct {
 	offsetStore     OffsetStore
 	brokers         map[string]net.Conn
 
-	rebalance      *Rebalance
-	remotingClient RemotingClient
-	mqClient       *MqClient
+	rebalance        *Rebalance
+	remotingClient   RemotingClient
+	mqClient         *MqClient
+	consumeTimeStamp time.Time
 }
 
 func NewDefaultConsumer(name string, conf *Config) (Consumer, error) {
@@ -141,13 +142,14 @@ func NewDefaultConsumer(name string, conf *Config) (Consumer, error) {
 	consumer := &DefaultConsumer{
 		conf:             conf,
 		consumerGroup:    name,
-		consumeFromWhere: "CONSUME_FROM_LAST_OFFSET",
+		consumeFromWhere: CONSUME_FROM_LAST_OFFSET,
 		subscription:     make(map[string]string),
 		offsetStore:      offsetStore,
 		brokers:          make(map[string]net.Conn),
 		rebalance:        rebalance,
 		remotingClient:   remotingClient,
 		mqClient:         mqClient,
+		consumeTimeStamp: time.Now().Add(-30 * time.Minute),
 	}
 
 	mqClient.consumerTable[name] = consumer
@@ -169,6 +171,7 @@ func (self *DefaultConsumer) Start() error {
 
 func (self *DefaultConsumer) Shutdown() {
 }
+
 func (self *DefaultConsumer) RegisterMessageListener(messageListener MessageListener) {
 	self.messageListener = messageListener
 }
@@ -185,14 +188,6 @@ func (self *DefaultConsumer) Subscribe(topic string, subExpression string) {
 
 func (self *DefaultConsumer) UnSubscribe(topic string) {
 	delete(self.subscription, topic)
-}
-
-func (self *DefaultConsumer) SendMessageBack(msg MessageExt, delayLevel int) error {
-	return nil
-}
-
-func (self *DefaultConsumer) fetchSubscribeMessageQueues(topic string) error {
-	return nil
 }
 
 func (slef *DefaultConsumer) parseNextBeginOffset(responseCommand *RemotingCommand) (nextBeginOffset int64) {
@@ -225,7 +220,7 @@ func (self *DefaultConsumer) pullMessage(pullRequest *PullRequest) {
 
 	sysFlag |= FLAG_SUSPEND
 
-	subscriptionData, ok := self.rebalance.subscriptionInner[pullRequest.messageQueue.topic]
+	subscriptionData, ok := self.rebalance.subscriptionInner[pullRequest.messageQueue.Topic]
 	var subVersion int64
 	var subString string
 	if ok {
@@ -237,8 +232,8 @@ func (self *DefaultConsumer) pullMessage(pullRequest *PullRequest) {
 
 	requestHeader := new(header.PullMessageRequestHeader)
 	requestHeader.ConsumerGroup = pullRequest.consumerGroup
-	requestHeader.Topic = pullRequest.messageQueue.topic
-	requestHeader.QueueId = pullRequest.messageQueue.queueId
+	requestHeader.Topic = pullRequest.messageQueue.Topic
+	requestHeader.QueueId = pullRequest.messageQueue.QueueId
 	requestHeader.QueueOffset = pullRequest.nextOffset
 
 	requestHeader.SysFlag = sysFlag
@@ -287,7 +282,7 @@ func (self *DefaultConsumer) pullMessage(pullRequest *PullRequest) {
 		self.mqClient.pullMessageService.pullRequestQueue <- nextPullRequest
 	}
 
-	brokerAddr, _, found := self.mqClient.findBrokerAddressInSubscribe(pullRequest.messageQueue.brokerName, 0, false)
+	brokerAddr, _, found := self.mqClient.findBrokerAddressInSubscribe(pullRequest.messageQueue.BrokerName, 0, false)
 	if found {
 		remotingCommand := NewRemotingCommand(PULL_MESSAGE, requestHeader)
 		self.remotingClient.invokeAsync(brokerAddr, remotingCommand, 1000, pullCallback)
