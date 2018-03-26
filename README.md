@@ -53,6 +53,7 @@ func producerOneWay() {
 	}
 }
 ```
+
 ```
 func producerAsync() {
 	var producer = rocketmq.NewDefaultProducer(testProducerGroup, conf)
@@ -64,6 +65,7 @@ func producerAsync() {
 		producer.SendAsync(message, &publishCallBack{})
 	}
 }
+```
 
 ```
 func main() {
@@ -88,6 +90,7 @@ func main() {
 	<-s
 }
 ```
+
 # feature plan
 ## producer
 * createTopicRoute
