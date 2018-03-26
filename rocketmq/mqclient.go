@@ -67,6 +67,7 @@ func (t *TopicPublishInfo) FetchQueueIndex() (index int) {
 		qIndex := atomic.AddInt32(&t.topicQueueIndex, 1)
 		qIndex = qIndex % int32(qLen)
 		index = int(qIndex)
+		//log.Printf("queueIndex:%v", qIndex)
 	}
 	return
 }
@@ -351,8 +352,10 @@ func (self *MqClient) getConsumerIdListByGroup(addr string, consumerGroup string
 			log.Println(err)
 			return nil, err
 		}
+		//log.Printf("getConsumerListByGroupResponseBody %#v", getConsumerListByGroupResponseBody.ConsumerIdList)
 		return getConsumerListByGroupResponseBody.ConsumerIdList, nil
 	}
+	//log.Printf("fail to get ConsumerIdListByGroup, response code %v", response.Code)
 	return nil, errors.New(fmt.Sprintf("fail to get ConsumerIdListByGroup, response code %v", response.Code))
 }
 

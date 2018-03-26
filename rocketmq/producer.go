@@ -25,11 +25,25 @@ SendMessageRequestHeader
 CommunicationMode
 TopicRoute:BrokerData/queueData
 
+默认的：
 SelectMessageQueueByHash
 */
 
 type SendCallBack interface {
 	OnSuccess(result *SendResult)
+}
+
+type MQSelector interface {
+	Select(queues []MessageQueue, queueIndex int) (mqQueue MessageQueue, err error)
+}
+
+// DefaultSelector is loading balance selector
+type DefaultSelector struct {
+}
+
+func (d *DefaultSelector) Select(queues []MessageQueue, queueIndex int) (mqQueue MessageQueue, err error) {
+	index := queueIndex % len(queues)
+	return queues[index], nil
 }
 
 type Producer interface {
@@ -38,6 +52,7 @@ type Producer interface {
 	Send(msg *MessageExt) (sendResult *SendResult, err error)
 	SendAsync(msg *MessageExt, sendCallBack SendCallBack)
 	SendOneWay(msg *MessageExt)
+	SendOrderly(msg *MessageExt, orderId int) (sendResult *SendResult, err error)
 }
 
 // DefaultProducer ...
@@ -86,6 +101,10 @@ func (d *DefaultProducer) Start() error {
 func (d *DefaultProducer) ShutDown() {
 
 }
+func (d *DefaultProducer) SendOrderly(msg *MessageExt, orderId int) (sendResult *SendResult, err error) {
+	sendResult, err = d.sendImplementWithSelector(msg, "Sync", nil, &DefaultSelector{}, orderId)
+	return
+}
 
 func (d *DefaultProducer) SendOneWay(msg *MessageExt) {
 	_, err := d.sendImplement(msg, "OneWay", nil)
@@ -108,19 +127,85 @@ func (d *DefaultProducer) Send(msg *MessageExt) (sendResult *SendResult, err err
 	return
 }
 
-func (d *DefaultProducer) sendImplement(msg *MessageExt, communicationMode string, sendCallback SendCallBack) (sendResult *SendResult, err error) {
-	err = d.checkMessage(msg)
-	if err != nil {
-		return
-	}
-	var topicPublishInfo *TopicPublishInfo
+func (d *DefaultProducer) getTopicPubInfo(msg *MessageExt) (topicPublishInfo *TopicPublishInfo, err error) {
+	//var topicPublishInfo *TopicPublishInfo
 	topicPublishInfo, err = d.mqClient.tryToFindTopicPublishInfo(msg.Topic)
 	if err != nil {
-		return
+		return nil, err
 	}
 
 	if topicPublishInfo.JudgeTopicPublishInfoOk() == false {
 		err = errors.New("topicPublishInfo is error,topic=" + msg.Topic)
+		return nil, err
+	}
+	return
+}
+
+func (d *DefaultProducer) sendImplementWithSelector(
+	msg *MessageExt,
+	communicationMode string,
+	sendCallback SendCallBack,
+	selector MQSelector,
+	orderId int) (sendResult *SendResult, err error) {
+	err = d.checkMessage(msg)
+	if err != nil {
+		return
+	}
+
+	var topicPublishInfo *TopicPublishInfo
+	topicPublishInfo, err = d.getTopicPubInfo(msg)
+	if err != nil {
+		return
+	}
+
+	queues := topicPublishInfo.MessageQueueList
+	var (
+		messageQueue MessageQueue
+	)
+
+	timeout := time.Second * 5 //默认发送超时时间为5s
+
+	//retry to send message
+	for times := 0; times < 15; times++ {
+		messageQueue, err = selector.Select(queues, orderId) //没有选择ActiveMessageQueue,默认选第一个
+		if err != nil {
+			return
+		}
+
+		sendResult, err = d.doSendMessage(msg, messageQueue, communicationMode, sendCallback, int64(timeout))
+		switch communicationMode {
+		case "Async":
+			return
+		case "OneWay":
+			return
+		case "Sync":
+			if sendResult.sendStatus != SendOK {
+				continue
+			}
+			return
+		default:
+			break
+		}
+		if err != nil {
+			return
+		}
+	}
+	return
+
+}
+
+func (d *DefaultProducer) sendImplement(
+	msg *MessageExt,
+	communicationMode string,
+	sendCallback SendCallBack) (sendResult *SendResult, err error) {
+	err = d.checkMessage(msg)
+	if err != nil {
+		return
+	}
+
+	var topicPublishInfo *TopicPublishInfo
+	topicPublishInfo, err = d.getTopicPubInfo(msg)
+	if err != nil {
 		return
 	}
 
@@ -137,7 +222,8 @@ func (d *DefaultProducer) sendImplement(msg *MessageExt, communicationMode strin
 		if err != nil {
 			return
 		}
-		sendResult, err = d.doSendMessage(msg, messageQueue, communicationMode, sendCallback, topicPublishInfo, int64(timeout))
+
+		sendResult, err = d.doSendMessage(msg, messageQueue, communicationMode, sendCallback, int64(timeout))
 		switch communicationMode {
 		case "Async":
 			return
@@ -172,7 +258,7 @@ func (d *DefaultProducer) tryToCompressMessage(message *MessageExt) (compressedF
 }
 
 func (d *DefaultProducer) doSendMessage(msg *MessageExt, messageQueue MessageQueue, communicationMode string,
-	sendCallback SendCallBack, info *TopicPublishInfo, timeout int64) (sendResult *SendResult, err error) {
+	sendCallback SendCallBack, timeout int64) (sendResult *SendResult, err error) {
 
 	var (
 		brokerAddr          string
@@ -305,25 +391,12 @@ func (d *DefaultProducer) checkMessage(msg *MessageExt) error {
 	return nil
 }
 
-//if first select : random one
-//if has error broker before ,skip the err broker
-
-/*
-tryToFindTopicPublishInfo和selectOneMessageQueue。前面说过在producer初始化时，会启动定时任务获取路由信息并更新到本地缓存，
-所以tryToFindTopicPublishInfo会首先从缓存中获取topic路由信息，如果没有获取到，则会自己去namesrv获取路由信息。
-selectOneMessageQueue方法通过轮询的方式，返回一个队列，以达到负载均衡的目的。
-
-如果Producer发送消息失败，会自动重试，重试的策略：
-重试次数 < retryTimesWhenSendFailed（可配置）
-总的耗时（包含重试n次的耗时） < sendMsgTimeout（发送消息时传入的参数）
-同时满足上面两个条件后，Producer会选择另外一个队列发送消息
-
-
-*/
+////if first select : random one
+////if has error broker before ,skip the err broker
 func selectOneMessageQueue(topicPublishInfo *TopicPublishInfo, lastFailedBroker string) (mqQueue MessageQueue, err error) {
 	queueIndex := topicPublishInfo.FetchQueueIndex()
 	queues := topicPublishInfo.MessageQueueList
-	if len(lastFailedBroker) == 0 {
+	if lastFailedBroker == "" {
 		mqQueue = queues[queueIndex]
 		return
 	}

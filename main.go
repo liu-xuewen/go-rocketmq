@@ -73,10 +73,25 @@ func producerAsync() {
 	}
 }
 
-/*生产者和消费者相关测试*/
-func main() {
-	log.Printf("start main")
+func producerOrdered() {
+	var producer = rocketmq.NewDefaultProducer(testProducerGroup, conf)
+	producer.Start()
+	var message = &rocketmq.MessageExt{}
+	message.Topic = testTopic
+	for i := 0; i < 20; i++ {
+		orderId := i % 5
+		str := fmt.Sprintf("KEY[%d]-ORDERID[%d]", i, orderId)
+		message.Body = []byte(str)
+		_, err := producer.SendOrderly(message, orderId)
+		if err != nil {
+			log.Printf("fail to send message %v", err)
+		} else {
+			log.Printf("send %v", str)
+		}
+	}
+}
 
+func consumerRun() {
 	consumer, err := rocketmq.NewDefaultConsumer(testConsumerGroup, conf)
 	if err != nil {
 		log.Println(err)
@@ -85,12 +100,16 @@ func main() {
 	consumer.Subscribe(testTopic, "*")
 	consumer.RegisterMessageListener(func(msgs []*rocketmq.MessageExt) error {
 		for _, msg := range msgs {
-			log.Printf("[%s] msgBody[%s]", msg.MsgId, string(msg.Body))
+			log.Printf("[%v] msgBody[%s]", msg.QueueId, string(msg.Body))
 		}
 		return nil
 	})
 	consumer.Start()
-	producerOneWay()
+}
+
+func main() {
+	consumerRun()
+	producerOrdered()
 	s := make(chan os.Signal, 1)
 	signal.Notify(s, syscall.SIGINT, syscall.SIGTERM)
 	<-s

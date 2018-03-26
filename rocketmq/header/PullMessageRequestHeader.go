@@ -12,3 +12,8 @@ type PullMessageRequestHeader struct {
 	Subscription         string `json:"subscription"`
 	SubVersion           int64  `json:"subVersion"`
 }
+
+//FromMap convert map[string]interface to struct
+func (g *PullMessageRequestHeader) FromMap(headerMap map[string]interface{}) {
+	return
+}

@@ -68,6 +68,26 @@ func producerAsync() {
 ```
 
 ```
+func producerOrdered() {
+	var producer = rocketmq.NewDefaultProducer(testProducerGroup, conf)
+	producer.Start()
+	var message = &rocketmq.MessageExt{}
+	message.Topic = testTopic
+	for i := 0; i < 20; i++ {
+		orderId := i % 5
+		str := fmt.Sprintf("KEY[%d]-ORDERID[%d]", i, orderId)
+		message.Body = []byte(str)
+		_, err := producer.SendOrderly(message, orderId)
+		if err != nil {
+			log.Printf("fail to send message %v", err)
+		} else {
+			log.Printf("send %v", str)
+		}
+	}
+}
+```
+
+```
 func main() {
 	log.Printf("start main")
 

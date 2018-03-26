@@ -5,7 +5,6 @@ import (
 	"net"
 	"os"
 	"strconv"
-	"sync/atomic"
 	"time"
 
 	"log"
@@ -77,6 +76,12 @@ ProcessQueue
 	PutMessage/ TakeMessage/ RemoveMessage
 	fillProcessQueueInfo
 
+
+rebalanceByTopic
+processQueueTable
+findConsumerIdList
+getConsumerIdListByGroup
+pullMessage LOOP
 */
 type Consumer interface {
 	//Admin
@@ -278,22 +283,13 @@ func (self *DefaultConsumer) pullMessage(pullRequest *PullRequest) {
 			nextOffset:    nextBeginOffset,
 			messageQueue:  pullRequest.messageQueue,
 		}
-		log.Printf("pullRequestQueue <- nextPullRequest")
+		//log.Printf("pullRequestQueue <- nextPullRequest")
 		self.mqClient.pullMessageService.pullRequestQueue <- nextPullRequest
 	}
 
 	brokerAddr, _, found := self.mqClient.findBrokerAddressInSubscribe(pullRequest.messageQueue.brokerName, 0, false)
 	if found {
-		currOpaque := atomic.AddInt32(&opaque, 1)
-		remotingCommand := new(RemotingCommand)
-		remotingCommand.Code = PULL_MESSAGE
-		remotingCommand.Opaque = currOpaque
-		remotingCommand.Flag = 0
-		remotingCommand.Language = "JAVA"
-		remotingCommand.Version = 79
-
-		remotingCommand.ExtFields = Struct2Map(requestHeader)
-
+		remotingCommand := NewRemotingCommand(PULL_MESSAGE, requestHeader)
 		self.remotingClient.invokeAsync(brokerAddr, remotingCommand, 1000, pullCallback)
 	}
 }

@@ -156,8 +156,6 @@ func (self *Rebalance) rebalanceByTopic(topic string) error {
 			log.Println(err)
 			return err
 		}
-
-		//log.Printf("rebalance topic[%s]", topic)
 		self.updateProcessQueueTableInRebalance(topic, allocateResult)
 		return nil
 	default:
@@ -175,6 +173,7 @@ func (self *Rebalance) updateProcessQueueTableInRebalance(topic string, mqSet []
 			pullRequest.consumerGroup = self.groupName
 			pullRequest.messageQueue = mq
 			pullRequest.nextOffset = self.computePullFromWhere(mq)
+			//log.Printf("pullRequestQueue <- pullRequest")
 			self.mqClient.pullMessageService.pullRequestQueue <- pullRequest
 			self.processQueueTableLock.Lock()
 			self.processQueueTable[*mq] = 1
