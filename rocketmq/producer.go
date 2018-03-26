@@ -295,6 +295,19 @@ func (d *DefaultProducer) checkMessage(msg *MessageExt) error {
 
 //if first select : random one
 //if has error broker before ,skip the err broker
+
+/*
+tryToFindTopicPublishInfo和selectOneMessageQueue。前面说过在producer初始化时，会启动定时任务获取路由信息并更新到本地缓存，
+所以tryToFindTopicPublishInfo会首先从缓存中获取topic路由信息，如果没有获取到，则会自己去namesrv获取路由信息。
+selectOneMessageQueue方法通过轮询的方式，返回一个队列，以达到负载均衡的目的。
+
+如果Producer发送消息失败，会自动重试，重试的策略：
+重试次数 < retryTimesWhenSendFailed（可配置）
+总的耗时（包含重试n次的耗时） < sendMsgTimeout（发送消息时传入的参数）
+同时满足上面两个条件后，Producer会选择另外一个队列发送消息
+
+
+*/
 func selectOneMessageQueue(topicPublishInfo *TopicPublishInfo, lastFailedBroker string) (mqQueue MessageQueue, err error) {
 	queueIndex := topicPublishInfo.FetchQueueIndex()
 	queues := topicPublishInfo.MessageQueueList

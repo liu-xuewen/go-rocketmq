@@ -42,6 +42,39 @@ type MessageExt struct {
 	PreparedTransactionOffset int64
 }
 
+//SetProperties set message's Properties
+func (m *MessageExt) SetProperties(properties map[string]string) {
+	m.Properties = properties
+	return
+}
+
+//SetBody set body
+func (m *MessageExt) SetBody(body []byte) {
+	m.Body = body
+}
+
+//SetFlag set message flag
+func (m *MessageExt) SetFlag(flag int32) {
+	m.Flag = flag
+	return
+}
+
+//SetTopic set topic
+func (m *MessageExt) SetTopic(topic string) {
+	m.Topic = topic
+}
+
+//GetMsgUniqueKey only use by system
+func (m *MessageExt) GetMsgUniqueKey() string {
+	if m.Properties != nil {
+		originMessageId := m.Properties[PROPERTY_UNIQ_CLIENT_MESSAGE_ID_KEYIDX]
+		if len(originMessageId) > 0 {
+			return originMessageId
+		}
+	}
+	return m.MsgId
+}
+
 //GeneratorMsgUniqueKey only use by system
 func (m *MessageExt) GeneratorMsgUniqueKey() {
 	if m.Properties == nil {
@@ -121,7 +154,7 @@ func decodeMessage(data []byte) []*MessageExt {
 			return nil
 		}
 
-		msg.Topic = string(topic)
+		msg.SetTopic(string(topic))
 		msg.QueueId = queueId
 		msg.SysFlag = sysFlag
 		msg.QueueOffset = queueOffset
@@ -129,13 +162,18 @@ func decodeMessage(data []byte) []*MessageExt {
 		msg.StoreSize = storeSize
 		msg.BornTimestamp = bornTimeStamp
 		msg.ReconsumeTimes = reconsumeTimes
-		msg.Flag = flag
-		//msg.commitLogOffset=physicOffset
+		msg.SetFlag(int32(flag))
+		msg.CommitLogOffset = physicOffset
 		msg.StoreTimestamp = storeTimestamp
 		msg.PreparedTransactionOffset = preparedTransactionOffset
-		msg.Body = body
-		msg.Properties = propertiesmap
-
+		msg.SetBody(body)
+		msg.SetProperties(propertiesmap)
+		//  <  3.5.8 use messageOffsetId
+		//  >= 3.5.8 use clientUniqMsgId
+		msg.MsgId = msg.GetMsgUniqueKey()
+		if msg.MsgId == "" {
+			msg.MsgId = GeneratorMessageOffsetId(storeHost, storePort, msg.CommitLogOffset)
+		}
 		msgs = append(msgs, msg)
 	}
 

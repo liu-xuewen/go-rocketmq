@@ -128,6 +128,11 @@ func (self *AllocateMessageQueueAveragely) allocate(consumerGroup string, curren
 	return nil, errors.New("cant't find currentCID")
 }
 
+/*
+1. 遍历Consumer下的所有topic，然后根据topic订阅所有的消息
+2. 获取同一topic和Consumer Group下的所有Consumer
+3. 然后根据具体的分配策略来分配消费队列，分配的策略包含：平均分配、消费端配置等
+*/
 func (self *Rebalance) rebalanceByTopic(topic string) error {
 	cidAll, err := self.mqClient.findConsumerIdList(topic, self.groupName)
 	if err != nil {

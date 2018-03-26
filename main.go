@@ -10,20 +10,20 @@ import (
 	"github.com/powxiao/go-rocketmq/rocketmq"
 )
 
+var (
+	nameServerAddress = "127.0.0.1:9876" //address split by ;  (for example 192.168.1.1:9876;192.168.1.2:9876)
+	testTopic         = "GoLangRMQ"
+	testProducerGroup = "GoLangProducer"
+	testConsumerGroup = "GoLangConsumer"
+)
+
 /*生产者和消费者相关测试*/
 func main() {
-	var (
-		nameServerAddress = "127.0.0.1:9876" //address split by ;  (for example 192.168.1.1:9876;192.168.1.2:9876)
-		testTopic         = "GoLangRMQ"
-		testProducerGroup = "GoLangProducer"
-		testConsumerGroup = "GoLangConsumer"
-	)
+
 	conf := &rocketmq.Config{
 		NameServer:   nameServerAddress,
 		InstanceName: "DEFAULT",
 	}
-	var producer = rocketmq.NewDefaultProducer(testProducerGroup, conf)
-	producer.Start()
 
 	consumer, err := rocketmq.NewDefaultConsumer(testConsumerGroup, conf)
 	if err != nil {
@@ -32,16 +32,16 @@ func main() {
 	}
 	consumer.Subscribe(testTopic, "*")
 	consumer.RegisterMessageListener(func(msgs []*rocketmq.MessageExt) error {
-		//successIndex := -1
 		for _, msg := range msgs {
 			log.Printf("[%s] msgBody[%s]", msg.MsgId, string(msg.Body))
-			//successIndex = index
+			//spew.Dump(msg)
 		}
 		return nil
-		//return ConsumeConcurrentlyResult{ConsumeConcurrentlyStatus: rocketmqm.CONSUME_SUCCESS, AckIndex: successIndex}
 	})
 	consumer.Start()
 
+	var producer = rocketmq.NewDefaultProducer(testProducerGroup, conf)
+	producer.Start()
 	//start send test message
 	var message = &rocketmq.MessageExt{}
 	message.Topic = testTopic
