@@ -204,20 +204,7 @@ func (slef *DefaultConsumer) parseNextBeginOffset(responseCommand *RemotingComma
 	return
 }
 
-/*
-一种是Push模式，即MQServer主动向消费端推送；另外一种是Pull模式，即消费端在需要时，主动到MQServer拉取。
-但在具体实现时，Push和Pull模式都是采用消费端主动拉取的方式。
-
-
-Consumer端每隔一段时间主动向broker发送拉消息请求，broker在收到Pull请求后，
-如果有消息就立即返回数据，Consumer端收到返回的消息后，再回调消费者设置的Listener方法。
-如果broker在收到Pull请求时，消息队列里没有数据，broker端会阻塞请求直到有数据传递或超时才返回。
-
-当然，Consumer端是通过一个线程将阻塞队列LinkedBlockingQueue中的PullRequest发送到broker拉取消息，
-以防止Consumer一致被阻塞。而Broker端，在接收到Consumer的PullRequest时，如果发现没有消息，
-就会把PullRequest扔到ConcurrentHashMap中缓存起来。broker在启动时，会启动一个线程不停的从ConcurrentHashMap取出PullRequest检查，直到有数据返回。*/
 func (self *DefaultConsumer) pullMessage(pullRequest *PullRequest) {
-
 	commitOffsetEnable := false
 	commitOffsetValue := int64(0)
 
@@ -260,7 +247,6 @@ func (self *DefaultConsumer) pullMessage(pullRequest *PullRequest) {
 
 	pullCallback := func(responseFuture *ResponseFuture) {
 		var nextBeginOffset int64 = pullRequest.nextOffset
-
 		if responseFuture != nil {
 			responseCommand := responseFuture.responseCommand
 			if responseCommand.Code == SUCCESS && len(responseCommand.Body) > 0 {
@@ -292,12 +278,11 @@ func (self *DefaultConsumer) pullMessage(pullRequest *PullRequest) {
 			nextOffset:    nextBeginOffset,
 			messageQueue:  pullRequest.messageQueue,
 		}
-
+		log.Printf("pullRequestQueue <- nextPullRequest")
 		self.mqClient.pullMessageService.pullRequestQueue <- nextPullRequest
 	}
 
 	brokerAddr, _, found := self.mqClient.findBrokerAddressInSubscribe(pullRequest.messageQueue.brokerName, 0, false)
-
 	if found {
 		currOpaque := atomic.AddInt32(&opaque, 1)
 		remotingCommand := new(RemotingCommand)

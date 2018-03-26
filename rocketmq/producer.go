@@ -88,14 +88,27 @@ func (d *DefaultProducer) ShutDown() {
 }
 
 func (d *DefaultProducer) SendOneWay(msg *MessageExt) {
-
+	_, err := d.sendImplement(msg, "OneWay", nil)
+	if err != nil {
+		log.Println(err)
+	}
 }
 
 func (d *DefaultProducer) SendAsync(msg *MessageExt, sendCallback SendCallBack) {
-
+	_, err := d.sendImplement(msg, "Async", sendCallback)
+	if err != nil {
+		log.Println(err)
+	}
+	return
 }
 
+// Send 默认是同步发送
 func (d *DefaultProducer) Send(msg *MessageExt) (sendResult *SendResult, err error) {
+	sendResult, err = d.sendImplement(msg, "Sync", nil)
+	return
+}
+
+func (d *DefaultProducer) sendImplement(msg *MessageExt, communicationMode string, sendCallback SendCallBack) (sendResult *SendResult, err error) {
 	err = d.checkMessage(msg)
 	if err != nil {
 		return
@@ -116,8 +129,7 @@ func (d *DefaultProducer) Send(msg *MessageExt) (sendResult *SendResult, err err
 		messageQueue     MessageQueue
 	)
 
-	communicationMode := "Sync" //默认是同步发送
-	timeout := time.Second * 5  //默认发送超时时间为5s
+	timeout := time.Second * 5 //默认发送超时时间为5s
 
 	//retry to send message
 	for times := 0; times < 15; times++ {
@@ -125,7 +137,7 @@ func (d *DefaultProducer) Send(msg *MessageExt) (sendResult *SendResult, err err
 		if err != nil {
 			return
 		}
-		sendResult, err = d.doSendMessage(msg, messageQueue, communicationMode, nil, topicPublishInfo, int64(timeout))
+		sendResult, err = d.doSendMessage(msg, messageQueue, communicationMode, sendCallback, topicPublishInfo, int64(timeout))
 		switch communicationMode {
 		case "Async":
 			return

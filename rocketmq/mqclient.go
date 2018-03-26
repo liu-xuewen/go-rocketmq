@@ -318,7 +318,9 @@ func (self *MqClient) findConsumerIdList(topic string, groupName string) ([]stri
 	brokerAddr, ok := self.findBrokerAddrByTopic(topic)
 	if !ok {
 		err := self.updateTopicRouteInfoFromNameServerByTopic(topic)
-		log.Println(err)
+		if err != nil {
+			return nil, err
+		}
 		brokerAddr, ok = self.findBrokerAddrByTopic(topic)
 	}
 
@@ -333,17 +335,7 @@ func (self *MqClient) findConsumerIdList(topic string, groupName string) ([]stri
 func (self *MqClient) getConsumerIdListByGroup(addr string, consumerGroup string, timeoutMillis int64) ([]string, error) {
 	requestHeader := new(header.GetConsumerListByGroupRequestHeader)
 	requestHeader.ConsumerGroup = consumerGroup
-
-	currOpaque := atomic.AddInt32(&opaque, 1)
-	request := &RemotingCommand{
-		Code:      GET_CONSUMER_LIST_BY_GROUP,
-		Language:  "JAVA",
-		Version:   79,
-		Opaque:    currOpaque,
-		Flag:      0,
-		ExtFields: Struct2Map(requestHeader),
-	}
-
+	request := NewRemotingCommand(GET_CONSUMER_LIST_BY_GROUP, requestHeader)
 	response, err := self.remotingClient.invokeSync(addr, request, timeoutMillis)
 	if err != nil {
 		log.Println(err)
@@ -361,8 +353,7 @@ func (self *MqClient) getConsumerIdListByGroup(addr string, consumerGroup string
 		}
 		return getConsumerListByGroupResponseBody.ConsumerIdList, nil
 	}
-
-	return nil, errors.New("getConsumerIdListByGroup error")
+	return nil, errors.New(fmt.Sprintf("fail to get ConsumerIdListByGroup, response code %v", response.Code))
 }
 
 func (self *MqClient) getTopicRouteInfoFromNameServer(topic string, timeoutMillis int64) (*TopicRouteData, error) {
@@ -404,6 +395,7 @@ func (self *MqClient) updateTopicRouteInfoFromNameServer() {
 func (self *MqClient) updateTopicRouteInfoFromNameServerByTopic(topic string) error {
 	topicRouteData, err := self.getTopicRouteInfoFromNameServer(topic, 3000*1000)
 	if err != nil {
+		log.Println(err)
 		return err
 	}
 

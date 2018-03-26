@@ -1,5 +1,7 @@
 package rocketmq
 
+import "fmt"
+
 //SendStatus message send result
 type SendStatus int
 
@@ -24,4 +26,9 @@ type SendResult struct {
 	offsetMsgID   string
 	regionID      string
 	traceOn       bool
+}
+
+func (s *SendResult) String() string {
+	return fmt.Sprintf("sendStatus:%v, msgID:%v, topic:%v, queueId:%v, brokerName:%v",
+		s.sendStatus, s.msgID, s.messageQueue.topic, s.messageQueue.queueId, s.messageQueue.brokerName)
 }
