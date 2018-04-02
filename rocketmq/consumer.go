@@ -30,61 +30,7 @@ type Config struct {
 	InstanceName string
 }
 
-/*
-listener:
-MessageListenerOrderly
-MessageListenerConcurrently
-
-
-DefaultMQPullConsumerImpl
-		pullConsumer = new DefaultMQPullConsumer(consumerGroup);
-        pullConsumer.setNamesrvAddr("127.0.0.1:9876");
-        pullConsumer.start();
-		findBrokerAddressInSubscribe
-		PullMessageRequestHeader
-		MessageQueue messageQueue = new MessageQueue(topic, brokerName, 0);
-		pullConsumer.pull(messageQueue, "*", 1024, 3);
-		pullConsumer.pull(messageQueue, "*", 1024, 3, new PullCallBack() {
-		});
-
-
-
-DefaultMQPushConsumerImpl
-		pushConsumer = new DefaultMQPushConsumer(consumerGroup);
-        pushConsumer.setNamesrvAddr("127.0.0.1:9876");
-		pushConsumer.setPullInterval(60 * 1000);
-        pushConsumer.registerMessageListener(new MessageListenerConcurrently() {
-            ...
-        });
-		pushConsumer.set(rebalancePushImpl)
-		pushConsumer.subscribe(topic, "*");
-        pushConsumer.start();
-		mQClientFactory.registerConsumer(consumerGroup, pushConsumerImpl);
-		PullMessageRequestHeader
-		createPullResult
-		findBrokerAddressInSubscribe
-		findConsumerIdList
-		updateTopicSubscribeInfo
-		ConsumeMessageConcurrentlyService
-		pullMessageService.executePullRequestImmediately(createPullRequest())
-
-RebalancePush topicSubscribeInfoTable
-        RebalancePushImpl rebalancePush = new RebalancePushImpl(consumerGroup, MessageModel.CLUSTERING,
-            new AllocateMessageQueueAveragely(), mqClientInstance, defaultMQPushConsumer);
-
-ProcessQueue
-	PutMessage/ TakeMessage/ RemoveMessage
-	fillProcessQueueInfo
-
-
-rebalanceByTopic
-processQueueTable
-findConsumerIdList
-getConsumerIdListByGroup
-pullMessage LOOP
-*/
 type Consumer interface {
-	//Admin
 	Start() error
 	Shutdown()
 	RegisterMessageListener(listener MessageListener)
@@ -93,6 +39,12 @@ type Consumer interface {
 }
 
 //fetchSubscribeMessageQueues(topic string) error
+
+type PullRequest struct {
+	consumerGroup string
+	messageQueue  *MessageQueue
+	nextOffset    int64
+}
 
 type DefaultConsumer struct {
 	conf             *Config
@@ -111,6 +63,7 @@ type DefaultConsumer struct {
 	remotingClient   RemotingClient
 	mqClient         *MqClient
 	consumeTimeStamp time.Time
+	pullRequestQueue chan *PullRequest
 }
 
 func NewDefaultConsumer(name string, conf *Config) (Consumer, error) {
@@ -137,8 +90,6 @@ func NewDefaultConsumer(name string, conf *Config) (Consumer, error) {
 	offsetStore.groupName = name
 	offsetStore.offsetTable = make(map[MessageQueue]int64)
 
-	pullMessageService := NewPullMessageService()
-
 	consumer := &DefaultConsumer{
 		conf:             conf,
 		consumerGroup:    name,
@@ -150,22 +101,28 @@ func NewDefaultConsumer(name string, conf *Config) (Consumer, error) {
 		remotingClient:   remotingClient,
 		mqClient:         mqClient,
 		consumeTimeStamp: time.Now().Add(-30 * time.Minute),
+		pullRequestQueue: make(chan *PullRequest, 1024),
 	}
 
 	mqClient.consumerTable[name] = consumer
 	mqClient.remotingClient = remotingClient
 	mqClient.conf = conf
 	mqClient.clientId = conf.ClientIp + "@" + strconv.Itoa(os.Getpid())
-	mqClient.pullMessageService = pullMessageService
-
 	rebalance.consumer = consumer
-	pullMessageService.consumer = consumer
 
 	return consumer, nil
 }
 
 func (self *DefaultConsumer) Start() error {
 	self.mqClient.start()
+	//等待rebalance topic来push queue
+	go func() {
+		for {
+			pullRequest := <-self.pullRequestQueue
+			self.pullMessage(pullRequest)
+		}
+	}()
+
 	return nil
 }
 
@@ -202,6 +159,10 @@ func (slef *DefaultConsumer) parseNextBeginOffset(responseCommand *RemotingComma
 		}
 	}
 	return
+}
+
+func (self *DefaultConsumer) pushMessage() {
+
 }
 
 func (self *DefaultConsumer) pullMessage(pullRequest *PullRequest) {
@@ -260,6 +221,7 @@ func (self *DefaultConsumer) pullMessage(pullRequest *PullRequest) {
 					self.offsetStore.updateOffset(pullRequest.messageQueue, nextBeginOffset, false)
 				}
 			} else if responseCommand.Code == PULL_NOT_FOUND {
+				log.Printf("%v", "PULL_NOT_FOUND")
 			} else if responseCommand.Code == PULL_RETRY_IMMEDIATELY || responseCommand.Code == PULL_OFFSET_MOVED {
 				log.Printf("pull message error,code=%d,request=%v", responseCommand.Code, requestHeader)
 				nextBeginOffset = self.parseNextBeginOffset(responseCommand)
@@ -278,8 +240,7 @@ func (self *DefaultConsumer) pullMessage(pullRequest *PullRequest) {
 			nextOffset:    nextBeginOffset,
 			messageQueue:  pullRequest.messageQueue,
 		}
-		//log.Printf("pullRequestQueue <- nextPullRequest")
-		self.mqClient.pullMessageService.pullRequestQueue <- nextPullRequest
+		self.pullRequestQueue <- nextPullRequest
 	}
 
 	brokerAddr, _, found := self.mqClient.findBrokerAddressInSubscribe(pullRequest.messageQueue.BrokerName, 0, false)

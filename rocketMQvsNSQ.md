@@ -49,6 +49,14 @@ RocketMQ特性
 * Message Track:Supported
 * Configuration:Work out of box,user only need to pay attention to a few configurations
 * Management and Operation Tools:Supported, rich web and terminal command to expose core metrics
+* 支持发布/订阅（Pub/Sub）和点对点（P2P）消息模型
+* 在一个队列中可靠的先进先出（FIFO）和严格的顺序传递
+* 支持拉（pull）和推（push）两种消息模式
+* 单一队列百万消息的堆积能力
+* 支持多种消息协议，如 JMS、MQTT 等
+* 分布式高可用的部署架构,满足至少一次消息传递语义
+* 提供 docker 镜像用于隔离测试和云集群部署
+* 提供配置、指标和监控等功能丰富的 Dashboard
 
 
 FAQ

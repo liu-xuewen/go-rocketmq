@@ -111,6 +111,40 @@ func main() {
 }
 ```
 
+# rocket MQ 介绍
+## 组件
+* nameserver 
+    - 每个nameserver记录完整的borker-topic路由信息
+    - 
+* broker
+* message queue
+* consumer
+* producer
+
+## F && Q
+
+# rocket MQ client SDK 介绍
+## 使用方法
+## 模块介绍
+* producer
+    - Sync发送
+    - Async发送
+    - OneWay发送
+* consumer
+    - 消费方式： pushConsumer 和 pullConsumer
+    - 首次消费的位置
+    
+* offsetStore
+
+* mqClient
+
+* remotingClient
+
+ 
+## 性能
+* Producer and Consumer Throughput
+    *100 bytes and messages are distributed over 3 topics
+
 # feature plan
 ## producer
 * createTopicRoute

@@ -14,14 +14,6 @@ import (
 	"github.com/powxiao/go-rocketmq/rocketmq/header"
 )
 
-/*
-sendMessageOneWay
-SendResult sendResult = mqClientAPI.sendMessage(brokerAddr, brokerName, msg, new SendMessageRequestHeader(),
-    3 * 1000, CommunicationMode.ONEWAY, new SendMessageContext(), defaultMQProducerImpl);
-
-sendMessageAsync
-*/
-
 //DEFAULT_TIMEOUT rocketmq client's default timeout
 var DEFAULT_TIMEOUT int64 = 3000
 
@@ -75,7 +67,7 @@ func (t *TopicPublishInfo) FetchQueueIndex() (index int) {
 type MqClient struct {
 	clientId              string
 	conf                  *Config
-	brokerAddrTable       map[string]map[string]string //map[brokerName]map[bokerId]addrs
+	brokerAddrTable       map[string]map[string]string //map[brokerName]map[brokerId]addrs
 	brokerAddrTableLock   sync.RWMutex
 	consumerTable         map[string]*DefaultConsumer
 	consumerTableLock     sync.RWMutex
@@ -85,7 +77,6 @@ type MqClient struct {
 	topicPublishInfoTable map[string]*TopicPublishInfo
 	topicPublishInfoLock  sync.RWMutex
 	remotingClient        RemotingClient
-	pullMessageService    *PullMessageService
 }
 
 func NewMqClient() *MqClient {
@@ -251,7 +242,8 @@ func (m *MqClient) tryToFindTopicPublishInfo(topic string) (topicPublicInfo *Top
 	return
 }
 
-func (self *MqClient) findBrokerAddressInSubscribe(brokerName string, brokerId int64, onlyThisBroker bool) (brokerAddr string, slave bool, found bool) {
+func (self *MqClient) findBrokerAddressInSubscribe(brokerName string,
+	brokerId int64, onlyThisBroker bool) (brokerAddr string, slave bool, found bool) {
 	slave = false
 	found = false
 	self.brokerAddrTableLock.RLock()
@@ -564,16 +556,9 @@ func (self *MqClient) doRebalance() {
 
 func (self *MqClient) start() {
 	self.startScheduledTask()
-	go self.pullMessageService.start()
 }
 
-type QueryConsumerOffsetRequestHeader struct {
-	ConsumerGroup string `json:"consumerGroup"`
-	Topic         string `json:"topic"`
-	QueueId       int32  `json:"queueId"`
-}
-
-func (self *MqClient) queryConsumerOffset(addr string, requestHeader *QueryConsumerOffsetRequestHeader, timeoutMillis int64) (int64, error) {
+func (self *MqClient) queryConsumerOffset(addr string, requestHeader *header.QueryConsumerOffsetRequestHeader, timeoutMillis int64) (int64, error) {
 	currOpaque := atomic.AddInt32(&opaque, 1)
 	remotingCommand := &RemotingCommand{
 		Code:     QUERY_CONSUMER_OFFSET,

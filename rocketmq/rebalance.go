@@ -17,14 +17,7 @@ type SubscriptionData struct {
 	SubVersion      int64
 }
 
-/*
-AllocateMessageQueueStrategy
-	AllocateMessageQueueAveragely
-	AllocateMessageQueueConsistentHash
-	AllocateMessageQueueAveragely
-	AllocateMessageQueueByConfig
-	AllocateMessageQueueByMachineRoom
-*/
+// Rebalance 用于选择MessageQueue
 type Rebalance struct {
 	groupName                    string
 	messageModel                 string
@@ -45,7 +38,7 @@ func NewRebalance() *Rebalance {
 		topicSubscribeInfoTable:      make(map[string][]*MessageQueue),
 		subscriptionInner:            make(map[string]*SubscriptionData),
 		allocateMessageQueueStrategy: new(AllocateMessageQueueAveragely),
-		messageModel:                 "CLUSTERING",
+		messageModel:                 "CLUSTERING", //BROADCASTING
 		processQueueTable:            make(map[MessageQueue]int32),
 	}
 }
@@ -74,6 +67,10 @@ type AllocateMessageQueueStrategy interface {
 }
 type AllocateMessageQueueAveragely struct{}
 
+/*
+	AllocateMessageQueueAveragely
+	AllocateMessageQueueConsistentHash
+*/
 func (self *AllocateMessageQueueAveragely) allocate(consumerGroup string, currentCID string, mqAll []*MessageQueue, cidAll []string) ([]*MessageQueue, error) {
 	if currentCID == "" {
 		return nil, errors.New("currentCID is empty")
@@ -130,9 +127,8 @@ func (self *AllocateMessageQueueAveragely) allocate(consumerGroup string, curren
 }
 
 func (self *Rebalance) rebalanceByTopic(topic string) error {
-	messageModel := "Clustering" //Broadcasting
-	switch messageModel {
-	case "Clustering":
+	switch self.messageModel {
+	case "CLUSTERING":
 		cidAll, err := self.mqClient.findConsumerIdList(topic, self.groupName)
 		if err != nil {
 			log.Printf("findConsumerIdList %v", err)
@@ -175,8 +171,7 @@ func (self *Rebalance) updateProcessQueueTableInRebalance(topic string, mqSet []
 			pullRequest.consumerGroup = self.groupName
 			pullRequest.messageQueue = mq
 			pullRequest.nextOffset = self.computePullFromWhere(mq)
-			//log.Printf("pullRequestQueue <- pullRequest")
-			self.mqClient.pullMessageService.pullRequestQueue <- pullRequest
+			self.consumer.pullRequestQueue <- pullRequest
 			self.processQueueTableLock.Lock()
 			self.processQueueTable[*mq] = 1
 			self.processQueueTableLock.Unlock()
@@ -190,6 +185,7 @@ func (self *Rebalance) computePullFromWhere(mq *MessageQueue) int64 {
 	lastOffset := self.consumer.offsetStore.readOffset(mq, READ_FROM_STORE)
 	switch self.consumer.consumeFromWhere {
 	case CONSUME_FROM_LAST_OFFSET:
+		//log.Printf("CONSUME_FROM_LAST_OFFSET mq %v lastOffset %v", mq.QueueId, lastOffset)
 		if lastOffset >= 0 {
 			result = lastOffset
 		} else {
@@ -201,6 +197,7 @@ func (self *Rebalance) computePullFromWhere(mq *MessageQueue) int64 {
 		}
 		break
 	case CONSUME_FROM_FIRST_OFFSET:
+		//log.Printf("CONSUME_FROM_FIRST_OFFSET mq %v lastOffset %v", mq.QueueId, lastOffset)
 		if lastOffset >= 0 {
 			result = lastOffset
 		} else {
@@ -208,6 +205,7 @@ func (self *Rebalance) computePullFromWhere(mq *MessageQueue) int64 {
 		}
 		break
 	case CONSUME_FROM_TIMESTAMP:
+		//log.Printf("CONSUME_FROM_TIMESTAMP mq %v lastOffset %v", mq.QueueId, lastOffset)
 		if lastOffset >= 0 {
 			result = lastOffset
 		} else {

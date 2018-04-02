@@ -5,6 +5,8 @@ import (
 	"log"
 	"sync"
 	"sync/atomic"
+
+	"github.com/powxiao/go-rocketmq/rocketmq/header"
 )
 
 const (
@@ -18,11 +20,7 @@ type OffsetStore interface {
 	readOffset(mq *MessageQueue, flag int) int64
 }
 
-/*
-LocalFileOffsetStore
-RemoteBrokerOffsetStore
-*/
-
+// RemoteOffsetStore ...
 type RemoteOffsetStore struct {
 	groupName       string
 	mqClient        *MqClient
@@ -38,8 +36,10 @@ func (self *RemoteOffsetStore) readOffset(mq *MessageQueue, readType int) int64 
 		offset, ok := self.offsetTable[*mq]
 		self.offsetTableLock.RUnlock()
 		if ok {
+			log.Printf("memory offset %v", offset)
 			return offset
 		} else if readType == READ_FROM_MEMORY {
+			log.Println("memory offset -1")
 			return -1
 		}
 	case READ_FROM_STORE:
@@ -68,7 +68,7 @@ func (self *RemoteOffsetStore) fetchConsumeOffsetFromBroker(mq *MessageQueue) (i
 	}
 
 	if found {
-		requestHeader := &QueryConsumerOffsetRequestHeader{}
+		requestHeader := &header.QueryConsumerOffsetRequestHeader{}
 		requestHeader.Topic = mq.Topic
 		requestHeader.QueueId = mq.QueueId
 		requestHeader.ConsumerGroup = self.groupName
