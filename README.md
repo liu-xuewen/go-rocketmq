@@ -15,46 +15,13 @@ var (
 		InstanceName: "DEFAULT",
 	}
 )
-```
 
-```
 type publishCallBack struct{}
 
 func (p *publishCallBack) OnSuccess(result *rocketmq.SendResult) {
 	log.Printf("%v", result.String())
 }
 
-func producerSync() {
-	var producer = rocketmq.NewDefaultProducer(testProducerGroup, conf)
-	producer.Start()
-	var message = &rocketmq.MessageExt{}
-	message.Topic = testTopic
-	for i := 0; i < 10; i++ {
-		message.Body = []byte(fmt.Sprintf("%d", i))
-		_, err := producer.Send(message)
-		if err != nil {
-			log.Printf("fail to send message %v", err)
-		} else {
-			log.Printf("send %v", i)
-		}
-		time.Sleep(time.Second)
-	}
-}
-```
-```
-func producerOneWay() {
-	var producer = rocketmq.NewDefaultProducer(testProducerGroup, conf)
-	producer.Start()
-	var message = &rocketmq.MessageExt{}
-	message.Topic = testTopic
-	for i := 0; i < 10; i++ {
-		message.Body = []byte(fmt.Sprintf("%d", i))
-		producer.SendOneWay(message)
-	}
-}
-```
-
-```
 func producerAsync() {
 	var producer = rocketmq.NewDefaultProducer(testProducerGroup, conf)
 	producer.Start()
@@ -65,9 +32,6 @@ func producerAsync() {
 		producer.SendAsync(message, &publishCallBack{})
 	}
 }
-```
-
-```
 func producerOrdered() {
 	var producer = rocketmq.NewDefaultProducer(testProducerGroup, conf)
 	producer.Start()
@@ -91,19 +55,7 @@ func producerOrdered() {
 func main() {
 	log.Printf("start main")
 
-	consumer, err := rocketmq.NewDefaultConsumer(testConsumerGroup, conf)
-	if err != nil {
-		log.Println(err)
-		return
-	}
-	consumer.Subscribe(testTopic, "*")
-	consumer.RegisterMessageListener(func(msgs []*rocketmq.MessageExt) error {
-		for _, msg := range msgs {
-			log.Printf("[%s] msgBody[%s]", msg.MsgId, string(msg.Body))
-		}
-		return nil
-	})
-	consumer.Start()
+
 	producerOneWay()
 	s := make(chan os.Signal, 1)
 	signal.Notify(s, syscall.SIGINT, syscall.SIGTERM)

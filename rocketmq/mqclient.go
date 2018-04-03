@@ -105,7 +105,7 @@ func ReadAble(perm int32) (ret bool) {
 	return
 }
 
-func BuildTopicSubscribeInfoFromRoteData(topic string, topicRouteData *TopicRouteData) (mqList []*MessageQueue) {
+func BuildTopicSubscribeInfoFromRouteData(topic string, topicRouteData *TopicRouteData) (mqList []*MessageQueue) {
 	mqList = make([]*MessageQueue, 0)
 	for _, queueData := range topicRouteData.QueueDatas {
 		if !ReadAble(queueData.Perm) {

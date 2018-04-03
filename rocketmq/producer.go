@@ -76,7 +76,6 @@ func NewDefaultProducer(name string, conf *Config) Producer {
 		conf.ClientIp = DEFAULT_IP
 	}
 
-	pullMessageService := NewPullMessageService()
 	remotingClient := NewDefaultRemotingClient()
 	mqClient := NewMqClient()
 	producer := &DefaultProducer{
@@ -88,7 +87,6 @@ func NewDefaultProducer(name string, conf *Config) Producer {
 	mqClient.remotingClient = remotingClient
 	mqClient.conf = conf
 	mqClient.clientId = conf.ClientIp + "@" + strconv.Itoa(os.Getpid())
-	mqClient.pullMessageService = pullMessageService
 
 	return producer
 }

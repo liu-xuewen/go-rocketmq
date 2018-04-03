@@ -33,13 +33,33 @@ type Config struct {
 type Consumer interface {
 	Start() error
 	Shutdown()
+	// Push 模式
 	RegisterMessageListener(listener MessageListener)
 	Subscribe(topic string, subExpression string)
 	UnSubscribe(topic string)
+
+	// Push 模式
+	Pull(topic, subExpression string, maxNum int) *PullResult
 }
 
 //fetchSubscribeMessageQueues(topic string) error
 
+/*
+ allocateMessageQueueStrategy用于Rebalance算法实现策略
+ messageModel消息模型，支持以下两种1.集群消费2.广播消费
+ offsetStore标记消息进度
+订阅机制，messageListener consumeFromWhere messageModel consumeThreadMin/Max
+pullThresholdForQueue 拉消息本地队列缓存消息最大数
+PullInterval 拉消息间隔，由于是长轮询，所以为0，但是如果应用了流控，也可以设置大于0的值，单位毫秒
+listener回调机制， 使用message queue listener来监听队列的变化
+registerTopics注册的topic集合
+*/
+
+type PullResult struct {
+	msg []*MessageExt
+}
+
+// PullRequest ...
 type PullRequest struct {
 	consumerGroup string
 	messageQueue  *MessageQueue
@@ -113,6 +133,68 @@ func NewDefaultConsumer(name string, conf *Config) (Consumer, error) {
 	return consumer, nil
 }
 
+func (self *DefaultConsumer) Pull(topic, subExpression string, maxNum int) *PullResult {
+	self.rebalance.topicSubscribeInfoTableLock.Lock()
+	mqs, ok := self.rebalance.topicSubscribeInfoTable[topic]
+	self.rebalance.topicSubscribeInfoTableLock.Unlock()
+	result := new(PullResult)
+	if ok && len(mqs) > 0 {
+		for _, messageQueue := range mqs {
+
+			commitOffsetEnable := false
+			commitOffsetValue := int64(0)
+
+			commitOffsetValue = self.offsetStore.readOffset(messageQueue, READ_FROM_MEMORY)
+			if commitOffsetValue > 0 {
+				commitOffsetEnable = true
+			}
+
+			var sysFlag int32 = 0
+			if commitOffsetEnable {
+				sysFlag |= FLAG_COMMIT_OFFSET
+			}
+
+			sysFlag |= FLAG_SUSPEND
+			subscriptionData, ok := self.rebalance.subscriptionInner[messageQueue.Topic]
+			var subVersion int64
+			var subString string
+			if ok {
+				subVersion = subscriptionData.SubVersion
+				subString = subscriptionData.SubString
+
+				sysFlag |= FLAG_SUBSCRIPTION
+			}
+
+			requestHeader := new(header.PullMessageRequestHeader)
+			requestHeader.ConsumerGroup = self.consumerGroup
+			requestHeader.Topic = messageQueue.Topic
+			requestHeader.QueueId = messageQueue.QueueId
+			requestHeader.QueueOffset = self.rebalance.computePullFromWhere(messageQueue)
+
+			requestHeader.SysFlag = sysFlag
+			requestHeader.CommitOffset = commitOffsetValue
+			requestHeader.SuspendTimeoutMillis = BrokerSuspendMaxTimeMillis
+
+			if ok {
+				requestHeader.SubVersion = subVersion
+				requestHeader.Subscription = subString
+			}
+
+			brokerAddr, _, found := self.mqClient.findBrokerAddressInSubscribe(messageQueue.BrokerName, 0, false)
+			if found {
+				remotingCommand := NewRemotingCommand(PULL_MESSAGE, requestHeader)
+				cmd, err := self.remotingClient.invokeSync(brokerAddr, remotingCommand, 1000)
+				if err != nil {
+					log.Printf("pull message failed, %v", err)
+				} else {
+					result.msg = append(decodeMessage(cmd.Body))
+				}
+			}
+		}
+	}
+	return result
+}
+
 func (self *DefaultConsumer) Start() error {
 	self.mqClient.start()
 	//等待rebalance topic来push queue
@@ -159,10 +241,6 @@ func (slef *DefaultConsumer) parseNextBeginOffset(responseCommand *RemotingComma
 		}
 	}
 	return
-}
-
-func (self *DefaultConsumer) pushMessage() {
-
 }
 
 func (self *DefaultConsumer) pullMessage(pullRequest *PullRequest) {
